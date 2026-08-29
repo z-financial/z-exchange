@@ -7,7 +7,7 @@
 | `stress-test/scripts/ledger-grpc-query-stress.js` | k6 gRPC query workload and result classification |
 | `stress-test/fixtures/ledger-query-fixture.sql` | Deterministic transactions and two entries per transaction |
 | `stress-test/run-query-stress.sh` | Database readiness, fixture provisioning, and k6 startup |
-| `deploy/docker-compose.ledger-query-stress-test.yml` | Standalone query-test deployment |
+| `deploy/stress-test/docker-compose.ledger-query-stress-test.yml` | Standalone query-test deployment |
 
 Run only against a test database. The database user needs permission to insert
 and read the dedicated fixture rows. Setting
@@ -32,7 +32,7 @@ export LEDGER_DB_PASSWORD=123
 
 COMPOSE_MENU=false COMPOSE_ANSI=never \
 docker compose --progress plain \
-  -f deploy/docker-compose.ledger-query-stress-test.yml up --build \
+  -f deploy/stress-test/docker-compose.ledger-query-stress-test.yml up --build \
   --abort-on-container-exit \
   --exit-code-from ledger-query-stress-test
 ```

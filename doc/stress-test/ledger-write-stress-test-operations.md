@@ -23,7 +23,7 @@ the Kafka listener, reply outbox, wallet balances, or hot-account contention.
 | `stress-test/fixtures/ledger-write-verification.sql` | Reconstructs expected committed entries and checks payload and double-entry integrity. |
 | `stress-test/run-write-stress.sh` | Waits for MySQL, provisions fixtures, runs k6, and executes SQL reconciliation. |
 | `stress-test/Dockerfile` | Packages k6, MySQL client, protobuf files, scripts, and fixtures. |
-| `deploy/docker-compose.ledger-write-stress-test.yml` | Runs the write entrypoint and supplies environment configuration. |
+| `deploy/stress-test/docker-compose.ledger-write-stress-test.yml` | Runs the write entrypoint and supplies environment configuration. |
 
 The container flow is:
 
@@ -113,7 +113,7 @@ Run commands from the repository root on the stress-test EC2:
 ```bash
 COMPOSE_MENU=false COMPOSE_ANSI=never \
 docker compose --progress plain \
-  -f deploy/docker-compose.ledger-write-stress-test.yml up --build \
+  -f deploy/stress-test/docker-compose.ledger-write-stress-test.yml up --build \
   --abort-on-container-exit \
   --exit-code-from ledger-write-stress-test
 ```
@@ -239,7 +239,7 @@ reconciliation to run.
 | `LEDGER_GRPC_DEADLINE_SECONDS` | `5` | Per-RPC deadline |
 
 Database, endpoint, VU, and Prometheus variables are defined in
-`deploy/docker-compose.ledger-write-stress-test.yml`.
+`deploy/stress-test/docker-compose.ledger-write-stress-test.yml`.
 
 Delayed duplicate iterations sleep while the open model continues scheduling
 new work. Increase preallocated/max VUs if k6 reports insufficient VUs or
@@ -398,7 +398,7 @@ After collecting logs:
 
 ```bash
 docker compose \
-  -f deploy/docker-compose.ledger-write-stress-test.yml down
+  -f deploy/stress-test/docker-compose.ledger-write-stress-test.yml down
 ```
 
 Retain these together:

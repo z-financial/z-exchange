@@ -24,15 +24,15 @@ relationship with ledger or infrastructure containers; it uses VPC endpoints.
 | File | Purpose |
 | --- | --- |
 | `deploy/docker-compose.wallet-service.yml` | Builds and runs wallet-service on its EC2 host. |
-| `deploy/wallet-test.env` | Wallet host, database, Kafka, ledger, and memory settings. |
-| `deploy/deploy-wallet-service.sh` | Validates Compose, builds the image, and starts wallet-service. |
-| `deploy/provision-wallet-database.sh` | Safely provisions the wallet schema/user on an existing MySQL volume. |
+| `deploy/env/wallet-test.env` | Wallet host, database, Kafka, ledger, and memory settings. |
+| `deploy/script/deploy-wallet-service.sh` | Validates Compose, builds the image, and starts wallet-service. |
+| `deploy/script/provision-wallet-database.sh` | Safely provisions the wallet schema/user on an existing MySQL volume. |
 | `wallet-service/src/main/resources/application-docker.yml` | Resolves Docker-profile settings from deployment variables. |
 | `monitoring/prometheus.yml` | Scrapes wallet metrics at `172.31.23.255:8082`. |
 
 ## Endpoint Configuration
 
-`deploy/wallet-test.env` contains the test-environment defaults:
+`deploy/env/wallet-test.env` contains the test-environment defaults:
 
 ```dotenv
 WALLET_PRIVATE_IP=172.31.23.255
@@ -63,7 +63,7 @@ The infrastructure Compose now mounts initialization files in this order:
 
 These files run automatically only when MySQL creates an empty `mysql-data`
 volume. Before a fresh infrastructure deployment, set matching wallet values in
-`deploy/infra-test.env`:
+`deploy/env/infra-test.env`:
 
 ```dotenv
 WALLET_DB_USERNAME=wallet
@@ -75,10 +75,10 @@ recreate MySQL so the new mounts and environment are present, then run the
 provisioner:
 
 ```bash
-docker compose --env-file deploy/infra-test.env \
+docker compose --env-file deploy/env/infra-test.env \
   -f deploy/docker-compose.infrastructure.yml up -d mysql
 
-bash deploy/provision-wallet-database.sh
+bash deploy/script/provision-wallet-database.sh
 ```
 
 The provisioner creates `trade_walletservice` only when absent. If it already
@@ -88,11 +88,11 @@ creation and grants.
 ## Wallet Deployment
 
 On the wallet EC2 instance, install Docker with the Compose plugin, clone the
-repository, configure `deploy/wallet-test.env`, and run from the repository root:
+repository, configure `deploy/env/wallet-test.env`, and run from the repository root:
 
 ```bash
-bash deploy/deploy-wallet-service.sh
-docker compose --env-file deploy/wallet-test.env \
+bash deploy/script/deploy-wallet-service.sh
+docker compose --env-file deploy/env/wallet-test.env \
   -f deploy/docker-compose.wallet-service.yml logs -f wallet-service
 ```
 
@@ -113,7 +113,7 @@ Prometheus must reload the updated configuration on the monitoring EC2. A
 container recreation is sufficient; rebuilding the image is unnecessary:
 
 ```bash
-docker compose --env-file deploy/monitor-test.env \
+docker compose --env-file deploy/env/monitor-test.env \
   -f deploy/docker-compose.monitoring.yml up -d --force-recreate prometheus
 ```
 

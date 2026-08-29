@@ -1,7 +1,0 @@
-singleServerConfig:
-  address: redis://192.168.52.100:6379
-  database: 0
-  connectionPoolSize: 64
-  connectionMinimumIdleSize: 24
-threads: 16
-nettyThreads: 32

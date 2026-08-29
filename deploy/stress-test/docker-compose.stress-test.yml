@@ -1,0 +1,23 @@
+services:
+  stress-test:
+    build:
+      context: ../..
+      dockerfile: stress-test/Dockerfile
+    image: z-exchange/stress-test:local
+    container_name: stress-test
+    environment:
+      LEDGER_GRPC_HOST: ${LEDGER_GRPC_HOST:-172.31.16.37}
+      LEDGER_GRPC_PORT: ${LEDGER_GRPC_PORT:-9191}
+      LEDGER_GRPC_DEADLINE_SECONDS: ${LEDGER_GRPC_DEADLINE_SECONDS:-5}
+      LEDGER_TEST_AMOUNT: ${LEDGER_TEST_AMOUNT:-100}
+      DB_HOST: ${INFRA_PRIVATE_IP:-172.31.18.211}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${LEDGER_DB_NAME:-trade_ledgerservice}
+      DB_USERNAME: ${LEDGER_DB_USERNAME:-ledger}
+      DB_PASSWORD: ${LEDGER_DB_PASSWORD:-ledger-local}
+      DB_READY_ATTEMPTS: ${DB_READY_ATTEMPTS:-30}
+      DB_CONNECT_TIMEOUT_SECONDS: ${DB_CONNECT_TIMEOUT_SECONDS:-5}
+      # Stream granular k6 results to the Prometheus receiver on the monitoring EC2.
+      K6_OUT: ${K6_OUT:-experimental-prometheus-rw}
+      K6_PROMETHEUS_RW_SERVER_URL: ${K6_PROMETHEUS_RW_SERVER_URL:-http://172.31.28.170:9290/api/v1/write}
+      K6_PROMETHEUS_RW_TREND_STATS: ${K6_PROMETHEUS_RW_TREND_STATS:-p(95),p(99),max}

@@ -1,5 +1,0 @@
-after refactor in cache-component-refactor-evaluation.md,
-I found Ops in common-util/src/main/java/com/exchange/common/redis/cache/ops becomes a thin layer.
-evaluate whether it is a good choice to remove this layer.
-evaluate whether removing Ops layer could affect further code evolvement.
-write your evaluation in ai/codex/refactor

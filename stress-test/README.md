@@ -73,7 +73,7 @@ From the repository root:
 ```bash
 COMPOSE_MENU=false COMPOSE_ANSI=never \
 docker compose --progress plain \
-  -f deploy/docker-compose.stress-test.yml up --build \
+  -f deploy/stress-test/docker-compose.stress-test.yml up --build \
   --abort-on-container-exit --exit-code-from stress-test
 ```
 
@@ -87,7 +87,7 @@ LEDGER_DB_USERNAME=ledger \
 LEDGER_DB_PASSWORD='replace-with-the-infrastructure-value' \
 COMPOSE_MENU=false COMPOSE_ANSI=never \
 docker compose --progress plain \
-  -f deploy/docker-compose.stress-test.yml up --build \
+  -f deploy/stress-test/docker-compose.stress-test.yml up --build \
   --abort-on-container-exit --exit-code-from stress-test
 ```
 
@@ -110,7 +110,7 @@ LEDGER_DB_USERNAME=ledger \
 LEDGER_DB_PASSWORD='replace-with-the-infrastructure-value' \
 COMPOSE_MENU=false COMPOSE_ANSI=never \
 docker compose --progress plain \
-  -f deploy/docker-compose.wallet-smoke-test.yml up --build \
+  -f deploy/stress-test/docker-compose.wallet-smoke-test.yml up --build \
   --abort-on-container-exit --exit-code-from wallet-smoke-test
 ```
 
@@ -121,7 +121,7 @@ characters.
 Run the standalone query workload with:
 
 ```bash
-docker compose -f deploy/docker-compose.ledger-query-stress-test.yml up --build \
+docker compose -f deploy/stress-test/docker-compose.ledger-query-stress-test.yml up --build \
   --abort-on-container-exit --exit-code-from ledger-query-stress-test
 ```
 
@@ -132,10 +132,10 @@ in `doc/stress-test/ledger-query-stress-test-operations.md`.
 Wallet write and query stress tests use their standalone Compose files:
 
 ```bash
-docker compose -f deploy/docker-compose.wallet-write-stress-test.yml up --build \
+docker compose -f deploy/stress-test/docker-compose.wallet-write-stress-test.yml up --build \
   --abort-on-container-exit --exit-code-from wallet-write-stress-test
 
-docker compose -f deploy/docker-compose.wallet-query-stress-test.yml up --build \
+docker compose -f deploy/stress-test/docker-compose.wallet-query-stress-test.yml up --build \
   --abort-on-container-exit --exit-code-from wallet-query-stress-test
 ```
 

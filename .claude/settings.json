@@ -1,8 +1,0 @@
-{
-  "env": {
-    "ANTHROPIC_AUTH_TOKEN": "sk-HnnpBUAxlICL5znjAfFe6058CcF5482592047aF59eAbB409",
-    "ANTHROPIC_BASE_URL": "https://api.apiyi.com"
-  }
-}
-
-

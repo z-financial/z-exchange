@@ -29,11 +29,11 @@ same EC2 instance.
 | `deploy/docker-compose.ledger-service.yml` | `172.31.16.37` | Ledger application and ledger logs. |
 | `deploy/docker-compose.wallet-service.yml` | `172.31.23.255` | Wallet application and wallet logs. |
 | `deploy/docker-compose.monitoring.yml` | `172.31.28.170` | Prometheus, Grafana, and monitoring data. |
-| `deploy/infra-test.env` | Infrastructure host | Infrastructure IP and database credentials. |
-| `deploy/kafka-test.env` | Kafka host | Kafka advertised address, memory, and topic settings. |
-| `deploy/ledger-test.env` | Ledger host | Ledger and infrastructure endpoints. |
-| `deploy/wallet-test.env` | Wallet host | Wallet and remote service endpoints. |
-| `deploy/monitor-test.env` | Monitoring host | Monitoring IP and container memory budgets. |
+| `deploy/env/infra-test.env` | Infrastructure host | Infrastructure IP and database credentials. |
+| `deploy/env/kafka-test.env` | Kafka host | Kafka advertised address, memory, and topic settings. |
+| `deploy/env/ledger-test.env` | Ledger host | Ledger and infrastructure endpoints. |
+| `deploy/env/wallet-test.env` | Wallet host | Wallet and remote service endpoints. |
+| `deploy/env/monitor-test.env` | Monitoring host | Monitoring IP and container memory budgets. |
 | `ledger-service/src/main/resources/application-docker.yml` | Ledger image | Docker profile defaults, overridable by Compose. |
 | `monitoring/prometheus.yml` | Monitoring host | Scrapes ledger and wallet actuator metrics. |
 
@@ -61,7 +61,7 @@ other EC2 hosts cannot resolve the Docker-only `kafka:29092` listener.
 
 ## Infrastructure EC2
 
-Use `deploy/infra-test.env`:
+Use `deploy/env/infra-test.env`:
 
 ```dotenv
 INFRA_PRIVATE_IP=172.31.18.211
@@ -81,19 +81,19 @@ REDIS_MAXMEMORY=384mb
 Start the infrastructure services from the repository root:
 
 ```bash
-docker compose --env-file deploy/infra-test.env -f deploy/docker-compose.infrastructure.yml up -d
-docker compose --env-file deploy/infra-test.env -f deploy/docker-compose.infrastructure.yml ps
-docker compose --env-file deploy/infra-test.env -f deploy/docker-compose.infrastructure.yml logs -f mysql redis
+docker compose --env-file deploy/env/infra-test.env -f deploy/docker-compose.infrastructure.yml up -d
+docker compose --env-file deploy/env/infra-test.env -f deploy/docker-compose.infrastructure.yml ps
+docker compose --env-file deploy/env/infra-test.env -f deploy/docker-compose.infrastructure.yml logs -f mysql redis
 ```
 
 MySQL initialization runs only while creating an empty `mysql-data` volume. It
 creates ledger schema, wallet schema, and service-user grants in numbered order.
-For an existing volume, use `bash deploy/provision-wallet-database.sh`; the
+For an existing volume, use `bash deploy/script/provision-wallet-database.sh`; the
 mounted initialization files do not run on ordinary restarts.
 
 ## Kafka EC2
 
-Use the Kafka host's private IP in `deploy/kafka-test.env`:
+Use the Kafka host's private IP in `deploy/env/kafka-test.env`:
 
 ```dotenv
 KAFKA_PRIVATE_IP=172.31.28.6
@@ -112,9 +112,9 @@ KAFKA_RETRY_TOPIC_COUNT=6
 Start Kafka and run the idempotent topic initializer:
 
 ```bash
-docker compose --env-file deploy/kafka-test.env -f deploy/docker-compose.kafka.yml up -d
-docker compose --env-file deploy/kafka-test.env -f deploy/docker-compose.kafka.yml ps
-docker compose --env-file deploy/kafka-test.env -f deploy/docker-compose.kafka.yml logs kafka-topic-init
+docker compose --env-file deploy/env/kafka-test.env -f deploy/docker-compose.kafka.yml up -d
+docker compose --env-file deploy/env/kafka-test.env -f deploy/docker-compose.kafka.yml ps
+docker compose --env-file deploy/env/kafka-test.env -f deploy/docker-compose.kafka.yml logs kafka-topic-init
 docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list
 ```
 
@@ -156,7 +156,7 @@ address migrates broker state.
 
 ## Ledger EC2
 
-Use `deploy/ledger-test.env`. Its database password must match the infrastructure
+Use `deploy/env/ledger-test.env`. Its database password must match the infrastructure
 host:
 
 ```dotenv
@@ -170,9 +170,9 @@ KAFKA_BOOTSTRAP_SERVERS=172.31.28.6:9092
 Build and start ledger-service:
 
 ```bash
-docker compose --env-file deploy/ledger-test.env -f deploy/docker-compose.ledger-service.yml up --build -d
-docker compose --env-file deploy/ledger-test.env -f deploy/docker-compose.ledger-service.yml ps
-docker compose --env-file deploy/ledger-test.env -f deploy/docker-compose.ledger-service.yml logs -f ledger-service
+docker compose --env-file deploy/env/ledger-test.env -f deploy/docker-compose.ledger-service.yml up --build -d
+docker compose --env-file deploy/env/ledger-test.env -f deploy/docker-compose.ledger-service.yml ps
+docker compose --env-file deploy/env/ledger-test.env -f deploy/docker-compose.ledger-service.yml logs -f ledger-service
 ```
 
 Verify the service:
@@ -184,7 +184,7 @@ curl http://172.31.16.37:8081/actuator/prometheus
 
 ## Monitoring EC2
 
-`deploy/monitor-test.env` configures the 2 GiB monitoring host:
+`deploy/env/monitor-test.env` configures the 2 GiB monitoring host:
 
 ```dotenv
 MONITOR_PRIVATE_IP=172.31.28.170
@@ -197,9 +197,9 @@ GRAFANA_MEMORY_RESERVATION=512m
 Start Prometheus and Grafana:
 
 ```bash
-docker compose --env-file deploy/monitor-test.env -f deploy/docker-compose.monitoring.yml up -d
-docker compose --env-file deploy/monitor-test.env -f deploy/docker-compose.monitoring.yml ps
-docker compose --env-file deploy/monitor-test.env -f deploy/docker-compose.monitoring.yml logs -f prometheus grafana
+docker compose --env-file deploy/env/monitor-test.env -f deploy/docker-compose.monitoring.yml up -d
+docker compose --env-file deploy/env/monitor-test.env -f deploy/docker-compose.monitoring.yml ps
+docker compose --env-file deploy/env/monitor-test.env -f deploy/docker-compose.monitoring.yml logs -f prometheus grafana
 ```
 
 Verify:

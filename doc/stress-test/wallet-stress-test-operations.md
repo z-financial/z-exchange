@@ -27,7 +27,7 @@ export WALLET_STRESS_WALLET_COUNT=100
 export WALLET_STRESS_DUPLICATE_PERCENT=5
 
 docker compose --progress plain \
-  -f deploy/docker-compose.wallet-write-stress-test.yml up --build \
+  -f deploy/stress-test/docker-compose.wallet-write-stress-test.yml up --build \
   --abort-on-container-exit --exit-code-from wallet-write-stress-test
 ```
 
@@ -53,7 +53,7 @@ export WALLET_QUERY_OWNER_TYPE=mixed
 export WALLET_QUERY_SYSTEM_PERCENT=25
 
 docker compose --progress plain \
-  -f deploy/docker-compose.wallet-query-stress-test.yml up --build \
+  -f deploy/stress-test/docker-compose.wallet-query-stress-test.yml up --build \
   --abort-on-container-exit --exit-code-from wallet-query-stress-test
 ```
 
