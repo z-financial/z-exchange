@@ -1,137 +1,44 @@
 # Ledger API Boundaries
 
-## Purpose
+Ledger exposes its business operations through gRPC and consumes asynchronous posting commands through Kafka. It does not expose a business REST/HTTP API.
 
-Ledger exposes two transports over the same application processors:
+## Network boundaries
 
-- gRPC is the internal service-to-service contract.
-- HTTP provides read-only, RESTful transaction queries for external clients and
-  HTTP-based performance tests.
+| Port/channel | Purpose |
+| --- | --- |
+| gRPC `9191` | Ledger account, posting, and transaction-query APIs |
+| HTTP `8081` | Spring Boot Actuator only: health, metrics, and Prometheus scraping |
+| Kafka | Wallet-to-Ledger posting commands and Ledger-to-Wallet replies |
 
-The HTTP controller does not call the gRPC service implementation. Both
-adapters call `GetLedgerTxnProcessor`, which keeps caching, database access, and
-business behavior identical across transports.
+Port `8081` must remain private to monitoring and operational clients. There are no `/api/...` Ledger routes.
 
-## HTTP API
+## gRPC services
 
-The HTTP server uses ledger-service port `8081`.
+The contracts are defined under [`grpc-proto/ledger-proto/src/main/proto`](../grpc-proto/ledger-proto/src/main/proto/).
 
-### Get by ledger transaction ID
+### `AccountService`
 
-```http
-GET /api/v1/ledger/transactions/{ledgerTxnId}?includeEntries=true
-```
+- `createAccount(CreateAccountRequestPb)` provisions an accounting account.
+- Wallet uses this RPC while creating and opening a wallet.
 
-The ledger transaction ID is the canonical resource identifier.
-`includeEntries` defaults to `false`; enabling it expands the response with the
-double-entry records.
+### `PostService`
 
-### Get by reference ID
+- `postTransaction(PostTransactionRequestPb)` validates and writes a balanced ledger transaction.
+- `getTxnById(GetTxnByIdRequestPb)` queries by Ledger transaction ID.
+- `getTxnByRefId(GetTxnByRefIdRequestPb)` queries by the caller's reference ID.
+- Both query methods can optionally include ledger entries.
 
-```http
-GET /api/v1/ledger/transactions?referenceId={referenceId}&includeEntries=true
-```
+The query RPCs share `GetLedgerTxnProcessor` and the same business metric boundary. Errors are returned through the protobuf `ErrorPb` contract; unexpected internal details are not exposed to callers.
 
-Reference ID is a unique alternate lookup key, represented as a collection
-filter rather than an action endpoint. It returns the matching transaction or
-`404 Not Found`.
+## Asynchronous posting
 
-Successful responses contain:
+Wallet's active settlement path does not call `postTransaction` synchronously. It writes a transactional outbox event and publishes a command to Kafka. Ledger consumes that command through the same posting processor used by gRPC, persists an idempotent reply outbox, and acknowledges the source record only after a durable outcome exists.
 
-```json
-{
-  "transaction": {
-    "ledgerTxnId": "ledger-txn-id",
-    "referenceId": "wallet-reference-id",
-    "metadata": "{}"
-  },
-  "entries": [
-    {
-      "ledgerEntryId": "entry-id",
-      "accountId": "account-id",
-      "direction": "DEBIT",
-      "amount": 100,
-      "assetId": "asset-1"
-    }
-  ]
-}
-```
+This preserves one posting implementation while supporting two ingress paths:
 
-Error responses use the ledger namespace and an HTTP status appropriate to the
-error category:
+- gRPC for direct trusted-service calls and tests;
+- Kafka for Wallet's eventually consistent settlement workflow.
 
-```json
-{
-  "error": {
-    "namespace": "ledger",
-    "code": 1001,
-    "message": "ledger_not_found",
-    "detail": "ledger not found"
-  }
-}
-```
+## Observability
 
-Internal error details are not returned to external clients.
-
-## gRPC API
-
-The gRPC server uses port `9191`.
-
-- `PostService/postTransaction` is the internal write command. It remains gRPC
-  only because wallet-to-ledger writes are internal asynchronous choreography,
-  not a public ledger operation.
-- `PostService/getTxnById` is the internal query by canonical ledger ID.
-- `PostService/getTxnByRefId` is the internal query by the originating business
-  reference.
-- `AccountService/createAccount` is internal account setup used by wallet
-  integration.
-
-Keeping internal gRPC avoids JSON conversion and provides generated protobuf
-contracts between trusted services. Keeping public HTTP read-only prevents
-external callers from bypassing wallet, which owns transaction decisions and
-balance constraints.
-
-## Metrics
-
-Both HTTP query methods call the processor through
-`LedgerBusinessMetrics.recordLedgerTxnQuery`. Existing
-`zexchange.ledger.requests` and `zexchange.ledger.processing.duration` metrics
-therefore continue to record the same operation labels, with `ingress=http`.
-The gRPC path records `ingress=grpc`.
-
-Spring also records HTTP transport metrics independently. Compare HTTP
-transport duration with ledger processing duration when determining whether
-the HTTP adapter, rather than the processor or data stores, is saturated.
-
-## Exposure and Security
-
-The current deployment binds HTTP to the ledger EC2 private VPC address. Do not
-expose port `8081` directly to the public internet. External access should pass
-through an API gateway or equivalent authentication and authorization layer.
-Authorization must verify that the caller owns or may view the requested
-transaction; knowledge of a transaction or reference ID is not authorization.
-
-## Smoke Tests
-
-`stress-test/scripts/ledger-grpc-smoke.js` uses k6 to verify all three
-`PostService` methods with one virtual user and one iteration:
-
-1. It posts a balanced transaction.
-2. It retrieves that transaction by reference ID.
-3. It retrieves the same transaction by ledger transaction ID.
-
-The stress-test entrypoint inserts the dedicated `k6-smoke-asset` Asset and
-`k6-smoke-account` Account directly into the ledger MySQL database before k6
-starts. Fixture time is therefore excluded from gRPC measurements. The SQL uses
-idempotent upserts, while the posted transaction receives a unique reference ID
-on every run.
-
-k6 loads the same source protobuf definitions used by ledger-service. It reuses
-one HTTP/2 connection for all three calls, checks both gRPC status and protobuf
-business error values, and exits nonzero if any correctness check or latency
-threshold fails.
-
-HTTP remains useful for external read clients, but ledger gRPC capacity must be
-measured through the gRPC contract rather than through the HTTP adapter. Future
-throughput tests should extend the k6 gRPC workload with an open arrival-rate
-executor instead of treating HTTP capacity as a proxy.
+Ledger records gRPC server and business-processing metrics separately. Business metrics include an `ingress` tag (`grpc` or `kafka`) so processor behavior can be compared without treating transport time as business time. Prometheus scrapes `/actuator/prometheus` on port `8081`.

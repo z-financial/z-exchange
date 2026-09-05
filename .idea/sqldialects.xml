@@ -6,7 +6,6 @@
     <file url="file://$PROJECT_DIR$/standard/sql/wallet_service.sql" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/wallet-service/src/main/java/com/exchange/app/wallet/dao/mapper/BalanceSnapshotMapper.java" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/wallet-service/src/main/java/com/exchange/app/wallet/dao/mapper/WalletMapper.java" dialect="GenericSQL" />
-    <file url="file://$PROJECT_DIR$/wallet-service/src/main/java/com/exchange/app/wallet/dao/mapper/WalletOutboxMapper.java" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/wallet-service/src/main/java/com/exchange/app/wallet/dao/mapper/WalletReservationMapper.java" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/wallet-service/src/main/java/com/exchange/app/wallet/dao/mapper/WalletTransactionMapper.java" dialect="GenericSQL" />
   </component>
