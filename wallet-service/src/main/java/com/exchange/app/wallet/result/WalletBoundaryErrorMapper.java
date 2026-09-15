@@ -42,8 +42,14 @@ public final class WalletBoundaryErrorMapper {
             return WalletServiceErrorCode.REQUEST_HASH_CONFLICT;
         }
 
-        // These common-util failures indicate malformed internal state or infra
-        // issues inside shared helpers, not caller-correctable wallet requests.
+        // TODO(public-infrastructure-error-boundary): Replace this blanket namespace collapse with
+        //  explicit mappings to wallet-owned UNAVAILABLE errors, but only after normal fallback and
+        //  server-side retry are exhausted, the condition is temporary, and replay is known safe
+        //  because no effect committed or the request has complete idempotency protection. Keep
+        //  malformed/serialization/configuration/invariant failures and unknown-result operations
+        //  INTERNAL, do not expose dependency-specific common codes publicly, and retain the
+        //  original common error in internal logs/metrics. Add mapper/category tests with the change.
+        //  Target policy: design/proposals/public-infrastructure-error-boundary-policy.md.
         if (ErrorNamespace.DB.equals(errorCode.getNamespace())
                 || ErrorNamespace.REDIS.equals(errorCode.getNamespace())
                 || ErrorNamespace.CACHE.equals(errorCode.getNamespace())

@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Current layered Redis idempotency flow</title>
+  <desc id="desc">A request is validated and assigned a stable hash and owner token. Redis coordinates the fast path with pending and accepted states, while service database lookup and unique constraints remain the durable duplicate-effect boundary. Redis failures fall back to the database, and successful commits refresh Redis best effort.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#334155"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#315f9f"/>
+    </marker>
+    <marker id="arrowOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#b45309"/>
+    </marker>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .title { font: 700 28px Inter, Segoe UI, Arial, sans-serif; fill: #172033; }
+      .subtitle { font: 400 16px Inter, Segoe UI, Arial, sans-serif; fill: #526077; }
+      .laneTitle { font: 700 21px Inter, Segoe UI, Arial, sans-serif; fill: #172033; }
+      .nodeTitle { font: 700 17px Inter, Segoe UI, Arial, sans-serif; fill: #172033; }
+      .nodeText { font: 400 14px Inter, Segoe UI, Arial, sans-serif; fill: #3f4b5f; }
+      .edgeText { font: 600 13px Inter, Segoe UI, Arial, sans-serif; fill: #334155; }
+      .small { font: 400 13px Inter, Segoe UI, Arial, sans-serif; fill: #526077; }
+      .lane { stroke-width: 2; rx: 18; }
+      .node { stroke-width: 2; rx: 12; filter: url(#shadow); }
+      .edge { fill: none; stroke: #334155; stroke-width: 3; marker-end: url(#arrow); }
+      .fallback { fill: none; stroke: #315f9f; stroke-width: 3; stroke-dasharray: 10 7; marker-end: url(#arrowBlue); }
+      .warning { fill: none; stroke: #b45309; stroke-width: 3; stroke-dasharray: 8 6; marker-end: url(#arrowOrange); }
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="#ffffff"/>
+  <text x="800" y="45" text-anchor="middle" class="title">Current layered Redis idempotency flow</text>
+  <text x="800" y="73" text-anchor="middle" class="subtitle">Redis coordinates and accelerates; MySQL chooses the durable winner.</text>
+
+  <rect x="35" y="105" width="400" height="700" class="lane" fill="#f7f8fa" stroke="#aab3c2"/>
+  <rect x="475" y="105" width="520" height="700" class="lane" fill="#f3f7fd" stroke="#91acd3"/>
+  <rect x="1035" y="105" width="530" height="700" class="lane" fill="#f3faf5" stroke="#8ab99a"/>
+  <text x="235" y="143" text-anchor="middle" class="laneTitle">Service request</text>
+  <text x="735" y="143" text-anchor="middle" class="laneTitle">Redis coordination</text>
+  <text x="1300" y="143" text-anchor="middle" class="laneTitle">Database correctness boundary</text>
+
+  <rect x="80" y="185" width="310" height="105" class="node" fill="#ffffff" stroke="#748094"/>
+  <text x="235" y="220" text-anchor="middle" class="nodeTitle">Prepare request identity</text>
+  <text x="235" y="248" text-anchor="middle" class="nodeText">Validate request + stable hash</text>
+  <text x="235" y="272" text-anchor="middle" class="nodeText">Generate a random owner token</text>
+
+  <rect x="520" y="185" width="430" height="105" class="node" fill="#e5efff" stroke="#527db9"/>
+  <text x="735" y="220" text-anchor="middle" class="nodeTitle">Claim with SET NX + pending TTL</text>
+  <text x="735" y="248" text-anchor="middle" class="nodeText">P:&lt;request-hash&gt;:&lt;owner-token&gt;</text>
+  <text x="735" y="272" text-anchor="middle" class="nodeText">One live Redis owner in the normal path</text>
+  <path d="M390 237 H520" class="edge"/>
+
+  <rect x="520" y="350" width="430" height="125" class="node" fill="#eef5ff" stroke="#527db9"/>
+  <text x="735" y="382" text-anchor="middle" class="nodeTitle">Existing value: GET + hash comparison</text>
+  <text x="735" y="411" text-anchor="middle" class="nodeText">PENDING + same hash → request processing</text>
+  <text x="735" y="436" text-anchor="middle" class="nodeText">ACCEPTED + same hash → cached transaction ID</text>
+  <text x="735" y="461" text-anchor="middle" class="nodeText">Different hash → request hash conflict</text>
+  <path d="M735 290 V350" class="edge"/>
+  <text x="747" y="326" class="edgeText">claim rejected</text>
+
+  <rect x="1080" y="185" width="440" height="105" class="node" fill="#e1f5e5" stroke="#398151"/>
+  <text x="1300" y="220" text-anchor="middle" class="nodeTitle">Lookup the service idempotency row</text>
+  <text x="1300" y="248" text-anchor="middle" class="nodeText">Wallet: initiator + idempotency key</text>
+  <text x="1300" y="272" text-anchor="middle" class="nodeText">Ledger: reference ID</text>
+  <path d="M950 237 H1080" class="edge"/>
+  <text x="1015" y="220" text-anchor="middle" class="edgeText">claimed</text>
+  <path d="M950 412 C1015 412 1015 270 1080 250" class="fallback"/>
+  <text x="1014" y="380" text-anchor="middle" class="edgeText">Redis error / miss race</text>
+
+  <rect x="1080" y="365" width="440" height="115" class="node" fill="#dff5e1" stroke="#398151"/>
+  <text x="1300" y="400" text-anchor="middle" class="nodeTitle">Business database transaction</text>
+  <text x="1300" y="428" text-anchor="middle" class="nodeText">Business effects + transaction row</text>
+  <text x="1300" y="452" text-anchor="middle" class="nodeText">Unique key permits one durable winner</text>
+  <path d="M1300 290 V365" class="edge"/>
+  <text x="1312" y="333" class="edgeText">row absent</text>
+
+  <rect x="1080" y="550" width="210" height="90" class="node" fill="#e1f5e5" stroke="#398151"/>
+  <text x="1185" y="584" text-anchor="middle" class="nodeTitle">Commit succeeds</text>
+  <text x="1185" y="612" text-anchor="middle" class="nodeText">Return new result</text>
+  <path d="M1235 480 L1202 550" class="edge"/>
+
+  <rect x="1310" y="550" width="210" height="90" class="node" fill="#fff0d6" stroke="#b66d08"/>
+  <text x="1415" y="584" text-anchor="middle" class="nodeTitle">Unique insert loses</text>
+  <text x="1415" y="612" text-anchor="middle" class="nodeText">Rollback + duplicate error</text>
+  <path d="M1370 480 L1402 550" class="warning"/>
+
+  <rect x="520" y="610" width="430" height="105" class="node" fill="#e5efff" stroke="#527db9"/>
+  <text x="735" y="645" text-anchor="middle" class="nodeTitle">Best-effort accepted cache</text>
+  <text x="735" y="673" text-anchor="middle" class="nodeText">A:&lt;request-hash&gt;:&lt;token&gt;:&lt;transaction-id&gt;</text>
+  <text x="735" y="697" text-anchor="middle" class="nodeText">Current completion is an unconditional SET</text>
+  <path d="M1080 595 C1015 595 1015 662 950 662" class="fallback"/>
+  <text x="1012" y="635" text-anchor="middle" class="edgeText">after commit</text>
+  <path d="M1080 235 C1015 235 1015 635 950 645" class="fallback"/>
+  <text x="1020" y="535" text-anchor="middle" class="edgeText">row exists → replay</text>
+
+  <rect x="80" y="610" width="310" height="105" class="node" fill="#ffffff" stroke="#748094"/>
+  <text x="235" y="645" text-anchor="middle" class="nodeTitle">Known pre-commit failure</text>
+  <text x="235" y="673" text-anchor="middle" class="nodeText">Lua deletes only the exact PENDING value</text>
+  <text x="235" y="697" text-anchor="middle" class="nodeText">Crash/exception cleanup relies on TTL</text>
+  <path d="M1080 450 C980 525 520 520 390 650" class="warning"/>
+  <text x="735" y="543" text-anchor="middle" class="edgeText">known rollback / pre-commit failure</text>
+
+  <text x="735" y="758" text-anchor="middle" class="small">PENDING and ACCEPTED expire automatically; expiration sends the next request through Redis claim and DB lookup again.</text>
+
+  <line x1="80" y1="855" x2="125" y2="855" class="edge"/>
+  <text x="140" y="860" class="small">Normal decision or transaction flow</text>
+  <line x1="535" y1="855" x2="580" y2="855" class="fallback"/>
+  <text x="595" y="860" class="small">Fallback or best-effort cache repair</text>
+  <line x1="1080" y1="855" x2="1125" y2="855" class="warning"/>
+  <text x="1140" y="860" class="small">Failure or known race boundary</text>
+</svg>

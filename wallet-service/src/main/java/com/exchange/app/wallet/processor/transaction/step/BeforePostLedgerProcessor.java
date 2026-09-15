@@ -224,7 +224,10 @@ public class BeforePostLedgerProcessor {
             }
 
             if (walletTransactionManager.insertIgnore(walletTxn) == 0) {
-                // TODO maybe get txn and return if info match
+                // TODO(idempotency-db-authority): After this attempt rolls back, load the winning
+                //  Wallet transaction and compare its persisted canonical request hash. Replay its
+                //  result for the same hash; return HASH_CONFLICT for a different hash. See
+                //  design/proposals/redis-idempotency-db-authoritative.md.
                 log.error("insert transaction failed, {}, {}", snapshotResult, walletTxn);
                 return Result.failure(WalletServiceErrorCode.WALLET_TRANSACTION_DUPLICATED, "unexpected transaction duplicated");
             }

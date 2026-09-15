@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1650" height="930" viewBox="0 0 1650 930" role="img" aria-labelledby="title desc">
+  <title id="title">Kafka and transactional-outbox reliability flow</title>
+  <desc id="desc">Wallet commits business state and a pending command outbox atomically, Kafka delivery may repeat, Ledger commits its posting before inserting a reply outbox in a separate transaction, and Wallet applies a successful reply before requesting acknowledgment. Retry workers recover eligible pending outbox rows, but exhausted rows require a separate recovery policy.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#315f9f"/>
+    </marker>
+    <marker id="arrowOrange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#b45309"/>
+    </marker>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .title { font: 700 28px Inter, Segoe UI, Arial, sans-serif; fill: #172033; }
+      .subtitle { font: 400 16px Inter, Segoe UI, Arial, sans-serif; fill: #526077; }
+      .laneTitle { font: 700 21px Inter, Segoe UI, Arial, sans-serif; fill: #172033; }
+      .nodeTitle { font: 700 17px Inter, Segoe UI, Arial, sans-serif; fill: #172033; }
+      .nodeText { font: 400 14px Inter, Segoe UI, Arial, sans-serif; fill: #3f4b5f; }
+      .edgeText { font: 600 13px Inter, Segoe UI, Arial, sans-serif; fill: #334155; }
+      .small { font: 400 13px Inter, Segoe UI, Arial, sans-serif; fill: #526077; }
+      .lane { stroke-width: 2; rx: 18; }
+      .node { stroke-width: 2; rx: 12; filter: url(#shadow); }
+      .edge { fill: none; stroke: #334155; stroke-width: 3; marker-end: url(#arrow); }
+      .recovery { fill: none; stroke: #315f9f; stroke-width: 3; stroke-dasharray: 10 7; marker-end: url(#arrowBlue); }
+      .gap { fill: none; stroke: #b45309; stroke-width: 3; marker-end: url(#arrowOrange); }
+    </style>
+  </defs>
+
+  <rect width="1650" height="930" fill="#ffffff"/>
+  <text x="825" y="45" text-anchor="middle" class="title">Kafka and transactional-outbox reliability flow</text>
+  <text x="825" y="73" text-anchor="middle" class="subtitle">Solid arrows are the normal path; dashed arrows are recovery or terminal routing.</text>
+
+  <rect x="35" y="105" width="470" height="750" class="lane" fill="#f3faf5" stroke="#8ab99a"/>
+  <rect x="590" y="105" width="470" height="750" class="lane" fill="#f3f7fd" stroke="#91acd3"/>
+  <rect x="1145" y="105" width="470" height="750" class="lane" fill="#fbf7f1" stroke="#c9aa7f"/>
+  <text x="270" y="143" text-anchor="middle" class="laneTitle">Wallet service</text>
+  <text x="825" y="143" text-anchor="middle" class="laneTitle">Kafka transport</text>
+  <text x="1380" y="143" text-anchor="middle" class="laneTitle">Ledger service</text>
+
+  <rect x="80" y="185" width="380" height="105" class="node" fill="#dff5e1" stroke="#398151"/>
+  <text x="270" y="220" text-anchor="middle" class="nodeTitle">Wallet transaction</text>
+  <text x="270" y="248" text-anchor="middle" class="nodeText">Business mutation + PENDING command</text>
+  <text x="270" y="272" text-anchor="middle" class="nodeText">committed atomically</text>
+
+  <rect x="635" y="185" width="380" height="105" class="node" fill="#e5efff" stroke="#527db9"/>
+  <text x="825" y="220" text-anchor="middle" class="nodeTitle">Command topic</text>
+  <text x="825" y="248" text-anchor="middle" class="nodeText">Delivery may repeat</text>
+  <text x="825" y="272" text-anchor="middle" class="nodeText">Partitioned by command / transaction ID</text>
+
+  <rect x="1190" y="185" width="380" height="105" class="node" fill="#fff8eb" stroke="#bc8b45"/>
+  <text x="1380" y="220" text-anchor="middle" class="nodeTitle">Command listener</text>
+  <text x="1380" y="248" text-anchor="middle" class="nodeText">Manual acknowledgment</text>
+  <text x="1380" y="272" text-anchor="middle" class="nodeText">Retryable-topic failure classification</text>
+
+  <path d="M460 237 H635" class="edge"/>
+  <text x="548" y="222" text-anchor="middle" class="edgeText">immediate publish</text>
+  <path d="M1015 237 H1190" class="edge"/>
+
+  <rect x="80" y="365" width="380" height="80" class="node" fill="#eef5ff" stroke="#527db9"/>
+  <text x="270" y="399" text-anchor="middle" class="nodeTitle">Wallet outbox retry worker</text>
+  <text x="270" y="425" text-anchor="middle" class="nodeText">Claims and republishes due PENDING rows</text>
+  <path d="M460 405 C540 405 555 295 635 260" class="recovery"/>
+
+  <rect x="635" y="385" width="380" height="90" class="node" fill="#fff3dc" stroke="#c98a2f"/>
+  <text x="825" y="420" text-anchor="middle" class="nodeTitle">Retry topics / DLT</text>
+  <text x="825" y="447" text-anchor="middle" class="nodeText">Delayed retry, then terminal routing</text>
+  <path d="M825 290 V385" class="recovery"/>
+
+  <rect x="1190" y="335" width="380" height="85" class="node" fill="#dff5e1" stroke="#398151"/>
+  <text x="1380" y="370" text-anchor="middle" class="nodeTitle">Ledger transaction</text>
+  <text x="1380" y="397" text-anchor="middle" class="nodeText">Posting commits before reply creation</text>
+  <path d="M1380 290 V335" class="edge"/>
+
+  <rect x="1190" y="495" width="380" height="90" class="node" fill="#fff0d6" stroke="#b66d08"/>
+  <text x="1380" y="530" text-anchor="middle" class="nodeTitle">Reply outbox transaction</text>
+  <text x="1380" y="557" text-anchor="middle" class="nodeText">Insert or verify PENDING reply separately</text>
+  <path d="M1380 420 V495" class="gap"/>
+  <rect x="1256" y="438" width="248" height="31" rx="15" fill="#fff7e8" stroke="#d99a3e"/>
+  <text x="1380" y="459" text-anchor="middle" class="edgeText" fill="#8a4b00">intentional post-commit gap</text>
+
+  <rect x="1190" y="635" width="380" height="70" class="node" fill="#f7f8fa" stroke="#748094"/>
+  <text x="1380" y="678" text-anchor="middle" class="nodeTitle">Acknowledge source record</text>
+  <path d="M1380 585 V635" class="edge"/>
+
+  <rect x="635" y="635" width="380" height="90" class="node" fill="#e5efff" stroke="#527db9"/>
+  <text x="825" y="670" text-anchor="middle" class="nodeTitle">Reply topic</text>
+  <text x="825" y="697" text-anchor="middle" class="nodeText">Delivery may repeat</text>
+  <path d="M1190 670 H1015" class="edge"/>
+  <text x="1102" y="655" text-anchor="middle" class="edgeText">best-effort publish</text>
+  <path d="M825 635 C825 560 885 530 885 475" class="recovery"/>
+
+  <rect x="1190" y="755" width="380" height="70" class="node" fill="#eef5ff" stroke="#527db9"/>
+  <text x="1380" y="785" text-anchor="middle" class="nodeTitle">Ledger outbox retry worker</text>
+  <text x="1380" y="808" text-anchor="middle" class="nodeText">Recovers pending replies</text>
+  <path d="M1190 790 C1115 790 1095 715 1015 695" class="recovery"/>
+
+  <rect x="80" y="635" width="380" height="90" class="node" fill="#dff5e1" stroke="#398151"/>
+  <text x="270" y="670" text-anchor="middle" class="nodeTitle">Wallet reply transaction</text>
+  <text x="270" y="697" text-anchor="middle" class="nodeText">Apply successful reply before acknowledgment</text>
+  <path d="M635 680 H460" class="edge"/>
+
+  <line x1="80" y1="885" x2="125" y2="885" class="edge"/>
+  <text x="140" y="890" class="small">Normal message or durable-state progression</text>
+  <line x1="520" y1="885" x2="565" y2="885" class="recovery"/>
+  <text x="580" y="890" class="small">Recovery / retry / terminal routing</text>
+  <rect x="1020" y="868" width="34" height="28" rx="6" fill="#fff0d6" stroke="#b66d08" stroke-width="2"/>
+  <text x="1068" y="889" class="small">Accepted non-atomic boundary</text>
+</svg>

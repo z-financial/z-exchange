@@ -25,6 +25,11 @@ public class IdempRedisClient {
     }
 
     public void markIdempDone(String service, String scope, String idempId, String hash, String token, String content, Duration ttl) {
+        // TODO(idempotency-owned-completion): Replace this unconditional SET with one atomic Lua compare-and-set.
+        //  Transition to ACCEPTED only when the current value is PENDING and is still owned by `token`;
+        //  an expired, missing, or moved claim must not be recreated or overwrite another owner. Return a
+        //  structured outcome so callers can keep an already committed DB result successful when ownership is lost.
+        //  Target protocol: design/proposals/redis-idempotency-db-authoritative.md.
         String k = CommonIdempHelper.idempKey(service, scope, idempId);
         String v = CommonIdempHelper.idempValue(CommonIdempStatus.ACCEPTED, hash, token, content);
         baseRedisSupport.set(k, v, ttl);

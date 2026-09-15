@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760" role="img" aria-labelledby="title desc">
+  <title id="title">Redis cache coherency and hot-data strategy selection</title>
+  <desc id="desc">The service store classifies stable reference mappings and mutable entities, then selects a normal Redis path or a promoted Wallet system-key path with local client-side caching. MySQL remains authoritative, versioned writes use atomic compare-and-set, and Redis failures fall back to MySQL.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#475569"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .title { font: 700 28px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 15px 'Segoe UI', Arial, sans-serif; fill: #475569; }
+      .panel-title { font: 700 19px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .box-title { font: 700 16px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .body { font: 400 14px 'Segoe UI', Arial, sans-serif; fill: #334155; }
+      .small { font: 400 13px 'Segoe UI', Arial, sans-serif; fill: #475569; }
+      .badge { font: 700 12px 'Segoe UI', Arial, sans-serif; fill: #ffffff; letter-spacing: .4px; }
+      .arrow { stroke: #475569; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .soft-arrow { stroke: #94a3b8; stroke-width: 2; stroke-dasharray: 7 6; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1280" height="760" rx="18" fill="#f8fafc"/>
+  <text x="60" y="56" class="title">Cache coherency follows data behavior, not one global policy</text>
+  <text x="60" y="84" class="subtitle">Stable mappings use raw values; mutable entities use database versions. Promoted Wallet system keys add a local read tier.</text>
+
+  <rect x="60" y="116" width="1160" height="82" rx="14" fill="#ffffff" stroke="#cbd5e1" filter="url(#shadow)"/>
+  <rect x="82" y="135" width="158" height="44" rx="10" fill="#0f766e"/>
+  <text x="161" y="162" text-anchor="middle" class="badge">SERVICE STORE</text>
+  <text x="270" y="149" class="box-title">Select by two independent facts</text>
+  <text x="270" y="174" class="body">Data shape: stable reference mapping or mutable entity · Access path: normal or locally promoted system key</text>
+
+  <rect x="60" y="230" width="560" height="378" rx="16" fill="#ffffff" stroke="#bfdbfe" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="660" y="230" width="560" height="378" rx="16" fill="#ffffff" stroke="#c4b5fd" stroke-width="2" filter="url(#shadow)"/>
+  <text x="90" y="270" class="panel-title">Normal path · Redis L2</text>
+  <text x="690" y="270" class="panel-title">Promoted Wallet system path · local L1 + Redis L2</text>
+
+  <rect x="90" y="300" width="500" height="112" rx="12" fill="#eff6ff" stroke="#93c5fd"/>
+  <rect x="108" y="317" width="102" height="24" rx="12" fill="#2563eb"/>
+  <text x="159" y="334" text-anchor="middle" class="badge">MUTABLE</text>
+  <text x="108" y="365" class="box-title">Versioned CACHE_ASIDE</text>
+  <text x="108" y="389" class="body">Post-commit update writes a versioned tombstone.</text>
+  <text x="108" y="408" class="small">DB refill uses atomic absent / equal / newer CAS.</text>
+
+  <rect x="90" y="438" width="500" height="112" rx="12" fill="#f0fdfa" stroke="#99f6e4"/>
+  <rect x="108" y="455" width="102" height="24" rx="12" fill="#0f766e"/>
+  <text x="159" y="472" text-anchor="middle" class="badge">STABLE</text>
+  <text x="108" y="503" class="box-title">Raw CACHE_ASIDE</text>
+  <text x="108" y="527" class="body">DB miss stores negative only if the key is absent.</text>
+  <text x="108" y="546" class="small">Insert writes a tombstone barrier; DB refill stores the mapping.</text>
+
+  <rect x="690" y="300" width="500" height="112" rx="12" fill="#f5f3ff" stroke="#c4b5fd"/>
+  <rect x="708" y="317" width="102" height="24" rx="12" fill="#7c3aed"/>
+  <text x="759" y="334" text-anchor="middle" class="badge">MUTABLE</text>
+  <text x="708" y="365" class="box-title">Versioned POST_REFRESH</text>
+  <text x="708" y="389" class="body">Committed value is written directly through version CAS.</text>
+  <text x="708" y="408" class="small">Client-side read cache is intended to track Redis invalidations.</text>
+
+  <rect x="690" y="438" width="500" height="112" rx="12" fill="#faf5ff" stroke="#d8b4fe"/>
+  <rect x="708" y="455" width="102" height="24" rx="12" fill="#9333ea"/>
+  <text x="759" y="472" text-anchor="middle" class="badge">STABLE</text>
+  <text x="708" y="503" class="box-title">Raw POST_REFRESH</text>
+  <text x="708" y="527" class="body">Committed insert writes the positive mapping immediately.</text>
+  <text x="708" y="546" class="small">The local tier removes a Redis network hop on repeated reads.</text>
+
+  <path d="M340 198 L340 224" class="arrow"/>
+  <path d="M940 198 L940 224" class="arrow"/>
+
+  <rect x="60" y="638" width="1160" height="82" rx="14" fill="#0f172a"/>
+  <text x="90" y="670" class="box-title" style="fill:#ffffff">Authoritative boundary: MySQL</text>
+  <text x="90" y="695" class="body" style="fill:#cbd5e1">Cache hit may be stale. Cache miss, tombstone, decode failure, or Redis failure falls back to DB. Redis maintenance remains best effort.</text>
+  <path d="M340 608 L340 632" class="soft-arrow"/>
+  <path d="M940 608 L940 632" class="soft-arrow"/>
+</svg>

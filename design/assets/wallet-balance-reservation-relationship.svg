@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="460" viewBox="0 0 1200 460" role="img" aria-labelledby="title desc">
+  <title id="title">Wallet balance and reservation relationship</title>
+  <desc id="desc">Available and reserved balance buckets protect spendability while a reservation tracks remaining, pending-settle, consumed, and released portions of a specific hold.</desc>
+  <defs>
+    <style>
+      .bg{fill:#f8fafc}.available{fill:#ecfdf5;stroke:#059669;stroke-width:2}.reserved{fill:#fff7ed;stroke:#ea580c;stroke-width:2}.state{fill:#fff;stroke:#475569;stroke-width:2}.settled{fill:#eff6ff;stroke:#2563eb;stroke-width:2}.title{font:700 24px system-ui;fill:#0f172a}.h{font:700 17px system-ui;fill:#0f172a}.s{font:14px system-ui;fill:#475569}.label{font:600 13px system-ui;fill:#334155}.a{stroke:#64748b;stroke-width:2.2;fill:none;marker-end:url(#arrow)}.ao{stroke:#ea580c;stroke-width:2.2;fill:none;marker-end:url(#orange)}.ab{stroke:#2563eb;stroke-width:2.2;fill:none;marker-end:url(#blue)}
+    </style>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0l9 4.5L0 9z" fill="#64748b"/></marker>
+    <marker id="orange" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0l9 4.5L0 9z" fill="#ea580c"/></marker>
+    <marker id="blue" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0l9 4.5L0 9z" fill="#2563eb"/></marker>
+  </defs>
+  <rect class="bg" width="1200" height="460"/>
+  <text class="title" x="40" y="44">Balance buckets protect spendability; reservations explain each hold</text>
+
+  <text class="h" x="55" y="91">Wallet balance</text>
+  <rect class="available" x="55" y="120" width="220" height="105" rx="12"/>
+  <text class="h" x="118" y="158">Available</text>
+  <text class="s" x="93" y="186">spendable immediately</text>
+  <rect class="reserved" x="390" y="120" width="220" height="105" rx="12"/>
+  <text class="h" x="457" y="158">Reserved</text>
+  <text class="s" x="421" y="186">held / in-flight value</text>
+  <path class="ao" d="M275 154h115"/><text class="label" x="307" y="141">reserve</text>
+  <path class="a" d="M390 199H275"/><text class="label" x="308" y="218">release</text>
+  <path class="ab" d="M610 172h115"/><text class="label" x="625" y="157">Ledger-confirmed</text><text class="label" x="643" y="177">transfer out</text>
+  <rect class="settled" x="725" y="120" width="200" height="105" rx="12"/>
+  <text class="h" x="773" y="158">Leaves Wallet</text>
+  <text class="s" x="762" y="186">accounted by Ledger</text>
+  <rect class="settled" x="970" y="120" width="175" height="105" rx="12"/>
+  <text class="h" x="1011" y="158">Transfer in</text>
+  <text class="s" x="995" y="186">Ledger-confirmed</text>
+  <path class="ab" d="M970 207c-145 75-581 73-695 0"/>
+
+  <text class="h" x="55" y="292">Reservation amount state</text>
+  <rect class="state" x="55" y="320" width="220" height="90" rx="12"/>
+  <text class="h" x="102" y="356">Remaining</text>
+  <text class="s" x="90" y="382">held and reusable</text>
+  <rect class="reserved" x="390" y="320" width="220" height="90" rx="12"/>
+  <text class="h" x="439" y="356">Pending settle</text>
+  <text class="s" x="432" y="382">awaiting Ledger</text>
+  <rect class="settled" x="725" y="320" width="200" height="90" rx="12"/>
+  <text class="h" x="786" y="356">Consumed</text>
+  <text class="s" x="770" y="382">accounting confirmed</text>
+  <rect class="available" x="970" y="320" width="175" height="90" rx="12"/>
+  <text class="h" x="1023" y="356">Released</text>
+  <text class="s" x="996" y="382">returned to available</text>
+  <path class="ao" d="M275 365h115"/><text class="label" x="307" y="350">consume</text>
+  <path class="ab" d="M610 365h115"/><text class="label" x="626" y="350">Ledger success</text>
+  <path class="a" d="M275 397c255 48 543 48 695 0"/><text class="label" x="574" y="440">release</text>
+</svg>

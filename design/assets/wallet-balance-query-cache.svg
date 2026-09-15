@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="430" viewBox="0 0 1120 430" role="img" aria-labelledby="title desc">
+ <title id="title">Wallet balance query and cache composition</title><desc id="desc">Wallet ID reads use a versioned snapshot cache; reference reads first use a service-scoped reference index, then the snapshot cache, with MySQL fallback.</desc>
+ <defs><style>.bg{fill:#f8fafc}.b{fill:#fff;stroke:#334155;stroke-width:2;rx:12}.c{fill:#fff7ed;stroke:#ea580c;stroke-width:2;rx:12}.d{fill:#eff6ff;stroke:#2563eb;stroke-width:2;rx:12}.t{font:600 16px system-ui;fill:#0f172a}.s{font:13px system-ui;fill:#475569}.a{stroke:#64748b;stroke-width:2;fill:none;marker-end:url(#m)}</style><marker id="m" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0l8 4-8 4z" fill="#64748b"/></marker></defs>
+ <rect class="bg" width="1120" height="430"/><text class="t" x="40" y="42" font-size="22">Two lookup identities converge on one versioned balance snapshot</text>
+ <rect class="b" x="45" y="95" width="190" height="90"/><text class="t" x="65" y="128">By Wallet ID</text><text class="s" x="65" y="155">direct entity lookup</text>
+ <rect class="b" x="45" y="260" width="190" height="90"/><text class="t" x="65" y="293">By reference</text><text class="s" x="65" y="320">service ID + ref ID</text>
+ <rect class="c" x="315" y="250" width="240" height="110"/><text class="t" x="335" y="283">Reference index cache</text><text class="s" x="335" y="309">scoped ref → Wallet ID</text><text class="s" x="335" y="333">value or negative result</text>
+ <rect class="c" x="640" y="100" width="235" height="120"/><text class="t" x="660" y="133">Versioned snapshot cache</text><text class="s" x="660" y="159">Wallet ID → snapshot</text><text class="s" x="660" y="183">normal cache-aside or</text><text class="s" x="660" y="204">promoted system hot path</text>
+ <rect class="d" x="940" y="185" width="140" height="110"/><text class="t" x="960" y="218">MySQL</text><text class="s" x="960" y="244">authoritative</text><text class="s" x="960" y="266">snapshot</text>
+ <path class="a" d="M235 140h405"/><path class="a" d="M235 305h80"/><path class="a" d="M555 305h60v-145h25"/><path class="a" d="M875 160h65"/><path class="a" d="M555 330h385"/>
+ <rect class="b" x="315" y="380" width="560" height="35"/><text class="s" x="337" y="403">Unresolved reads use authoritative MySQL; successful loads repopulate the cache.</text>
+</svg>

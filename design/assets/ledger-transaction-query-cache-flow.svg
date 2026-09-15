@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="520" viewBox="0 0 1280 520" role="img" aria-labelledby="title desc">
+  <title id="title">Ledger transaction query and cache read model</title>
+  <desc id="desc">A query by reference resolves a cached transaction ID before using the versioned entity path; a query by transaction ID enters the entity path directly, and optional entries are loaded from MySQL.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#475569"/></marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.12"/></filter>
+    <style>.title{font:700 28px 'Segoe UI',Arial,sans-serif;fill:#0f172a}.subtitle{font:400 15px 'Segoe UI',Arial,sans-serif;fill:#475569}.box-title{font:700 16px 'Segoe UI',Arial,sans-serif;fill:#0f172a}.body{font:400 13px 'Segoe UI',Arial,sans-serif;fill:#475569}.badge{font:700 12px 'Segoe UI',Arial,sans-serif;fill:#fff}.arrow{stroke:#475569;stroke-width:2;fill:none;marker-end:url(#arrow)}.dash{stroke:#64748b;stroke-width:2;stroke-dasharray:7 6;fill:none;marker-end:url(#arrow)}</style>
+  </defs>
+  <rect width="1280" height="520" rx="18" fill="#f8fafc"/>
+  <text x="55" y="56" class="title">Two identities, one authoritative transaction</text>
+  <text x="55" y="84" class="subtitle">The reference index resolves identity; the versioned entity cache serves the transaction; entries remain optional.</text>
+
+  <rect x="55" y="130" width="210" height="105" rx="14" fill="#fff" stroke="#cbd5e1" filter="url(#shadow)"/>
+  <text x="75" y="168" class="box-title">Query by reference ID</text><text x="75" y="197" class="body">external stable identity</text><text x="75" y="219" class="body">negative cache enabled</text>
+  <rect x="330" y="125" width="235" height="115" rx="14" fill="#fef3c7" stroke="#fbbf24" filter="url(#shadow)"/>
+  <rect x="350" y="143" width="72" height="24" rx="12" fill="#b45309"/><text x="386" y="160" text-anchor="middle" class="badge">REDIS</text>
+  <text x="350" y="193" class="box-title">Reference index</text><text x="350" y="219" class="body">referenceId → txnId</text>
+  <path d="M265 183 L322 183" class="arrow"/>
+
+  <rect x="55" y="315" width="210" height="105" rx="14" fill="#fff" stroke="#cbd5e1" filter="url(#shadow)"/>
+  <text x="75" y="353" class="box-title">Query by transaction ID</text><text x="75" y="382" class="body">direct entity identity</text><text x="75" y="404" class="body">no negative caching</text>
+
+  <rect x="635" y="220" width="235" height="120" rx="14" fill="#eff6ff" stroke="#93c5fd" filter="url(#shadow)"/>
+  <rect x="655" y="238" width="72" height="24" rx="12" fill="#2563eb"/><text x="691" y="255" text-anchor="middle" class="badge">REDIS</text>
+  <text x="655" y="291" class="box-title">Versioned entity</text><text x="655" y="317" class="body">txnId → LedgerTxn + version</text>
+  <path d="M565 183 L600 183 L600 270 L627 270" class="arrow"/><path d="M265 368 L600 368 L600 290 L627 290" class="arrow"/>
+
+  <rect x="940" y="210" width="275" height="140" rx="14" fill="#0f172a" filter="url(#shadow)"/>
+  <rect x="960" y="228" width="86" height="24" rx="12" fill="#7c3aed"/><text x="1003" y="245" text-anchor="middle" class="badge">MYSQL</text>
+  <text x="960" y="285" class="box-title" style="fill:#fff">Authoritative read</text><text x="960" y="312" class="body" style="fill:#cbd5e1">ledger transaction by unique ID</text><text x="960" y="335" class="body" style="fill:#cbd5e1">optional keyset-paged entries</text>
+  <path d="M870 280 L932 280" class="arrow"/>
+
+  <rect x="635" y="400" width="580" height="72" rx="14" fill="#ecfdf5" stroke="#86efac"/>
+  <text x="660" y="431" class="box-title">Cache fill after authoritative read</text><text x="660" y="456" class="body">Populate the transaction entity and, for reference lookup, the stable reference index.</text>
+  <path d="M1077 350 L1077 392" class="dash"/>
+</svg>

@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760" role="img" aria-labelledby="title desc">
+  <title id="title">Database transaction, persistence, exception, and metrics flow</title>
+  <desc id="desc">A service processor enters a result-aware transaction executor. Repositories use MyBatis to access MySQL. Successful Results commit, failed Results roll back and return, and exceptions roll back before recognized database failures are translated. Statement and transaction metrics observe different boundaries.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#475569"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .title { font: 700 28px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 15px 'Segoe UI', Arial, sans-serif; fill: #475569; }
+      .panel-title { font: 700 18px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .box-title { font: 700 16px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .body { font: 400 14px 'Segoe UI', Arial, sans-serif; fill: #334155; }
+      .small { font: 400 13px 'Segoe UI', Arial, sans-serif; fill: #475569; }
+      .badge { font: 700 12px 'Segoe UI', Arial, sans-serif; fill: #ffffff; letter-spacing: .35px; }
+      .arrow { stroke: #475569; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .dash { stroke: #64748b; stroke-width: 2; stroke-dasharray: 7 6; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1280" height="760" rx="18" fill="#f8fafc"/>
+  <text x="60" y="56" class="title">One atomic unit, two observable boundaries</text>
+  <text x="60" y="84" class="subtitle">Project code adds Result-aware rollback and DB error normalization around Spring and MyBatis.</text>
+
+  <rect x="60" y="120" width="220" height="94" rx="14" fill="#ffffff" stroke="#cbd5e1" filter="url(#shadow)"/>
+  <rect x="80" y="139" width="112" height="24" rx="12" fill="#334155"/>
+  <text x="136" y="156" text-anchor="middle" class="badge">PROCESSOR</text>
+  <text x="80" y="186" class="box-title">Service workflow</text>
+  <text x="80" y="205" class="small">Owns domain decisions</text>
+
+  <rect x="330" y="112" width="320" height="110" rx="14" fill="#eff6ff" stroke="#93c5fd" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="350" y="133" width="118" height="24" rx="12" fill="#2563eb"/>
+  <text x="409" y="150" text-anchor="middle" class="badge">TRANSACTION</text>
+  <text x="350" y="183" class="box-title">DbTxnExecutor</text>
+  <text x="350" y="204" class="small">Fresh template · failed Result rolls back</text>
+
+  <rect x="700" y="120" width="220" height="94" rx="14" fill="#f0fdfa" stroke="#99f6e4" filter="url(#shadow)"/>
+  <rect x="720" y="139" width="112" height="24" rx="12" fill="#0f766e"/>
+  <text x="776" y="156" text-anchor="middle" class="badge">REPOSITORY</text>
+  <text x="720" y="186" class="box-title">MyBatis mapper</text>
+  <text x="720" y="205" class="small">Locks · CAS · batch SQL</text>
+
+  <rect x="970" y="120" width="250" height="94" rx="14" fill="#0f172a" filter="url(#shadow)"/>
+  <rect x="990" y="139" width="82" height="24" rx="12" fill="#7c3aed"/>
+  <text x="1031" y="156" text-anchor="middle" class="badge">MYSQL</text>
+  <text x="990" y="186" class="box-title" style="fill:#ffffff">Authoritative state</text>
+  <text x="990" y="205" class="small" style="fill:#cbd5e1">PK / UK · row locks · commit</text>
+
+  <path d="M280 167 L322 167" class="arrow"/>
+  <path d="M650 167 L692 167" class="arrow"/>
+  <path d="M920 167 L962 167" class="arrow"/>
+
+  <rect x="330" y="252" width="320" height="76" rx="12" fill="#dbeafe" stroke="#60a5fa"/>
+  <text x="350" y="280" class="box-title">Transaction timer</text>
+  <text x="350" y="302" class="body">Acquire → callback → commit / rollback</text>
+  <path d="M490 222 L490 244" class="dash"/>
+
+  <rect x="700" y="252" width="520" height="76" rx="12" fill="#ccfbf1" stroke="#5eead4"/>
+  <text x="720" y="280" class="box-title">Statement timer + error counter</text>
+  <text x="720" y="302" class="body">MapperName.method · command · outcome / normalized error type</text>
+  <path d="M810 214 L810 244" class="dash"/>
+
+  <text x="60" y="390" class="panel-title">Callback outcome controls transaction completion</text>
+
+  <rect x="60" y="420" width="350" height="170" rx="15" fill="#ecfdf5" stroke="#86efac" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="82" y="442" width="104" height="24" rx="12" fill="#15803d"/>
+  <text x="134" y="459" text-anchor="middle" class="badge">SUCCESS</text>
+  <text x="82" y="497" class="box-title">Successful Result</text>
+  <text x="82" y="525" class="body">Spring commits the transaction.</text>
+  <text x="82" y="550" class="small">Return only after commit completes.</text>
+
+  <rect x="465" y="420" width="350" height="170" rx="15" fill="#fff7ed" stroke="#fdba74" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="487" y="442" width="104" height="24" rx="12" fill="#c2410c"/>
+  <text x="539" y="459" text-anchor="middle" class="badge">FAILURE</text>
+  <text x="487" y="497" class="box-title">Failed Result</text>
+  <text x="487" y="525" class="body">Executor marks rollback-only.</text>
+  <text x="487" y="550" class="small">Rollback, then return the same failure.</text>
+
+  <rect x="870" y="420" width="350" height="170" rx="15" fill="#fef2f2" stroke="#fca5a5" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="892" y="442" width="116" height="24" rx="12" fill="#b91c1c"/>
+  <text x="950" y="459" text-anchor="middle" class="badge">EXCEPTION</text>
+  <text x="892" y="497" class="box-title">Thrown DB failure</text>
+  <text x="892" y="525" class="body">Rollback; classify at the boundary.</text>
+  <text x="892" y="550" class="small">Recognized → DbException · unknown → original</text>
+
+  <path d="M490 328 L235 412" class="arrow"/>
+  <path d="M490 328 L640 412" class="arrow"/>
+  <path d="M960 328 L1045 412" class="arrow"/>
+
+  <rect x="60" y="630" width="1160" height="82" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="86" y="662" class="box-title">Failure boundary</text>
+  <text x="86" y="687" class="body">No automatic retry. Unknown commit outcome is still failure—not proof of rollback—so the surrounding workflow needs stable idempotency or an authoritative status read.</text>
+</svg>

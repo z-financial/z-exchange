@@ -91,7 +91,10 @@ public class PostLedgerProcessor {
         }
         Result<Void> result = dbTxnExecutor.executeWithDefault(() -> {
             if (ledgerTxnRepository.insertIgnore(ledgerTxn) == 0) {
-                // TODO maybe get txn and return if info match
+                // TODO(idempotency-db-authority): Resolve this duplicate-insert race by loading the
+                //  winning Ledger transaction and comparing its persisted canonical request hash.
+                //  Replay the winner for the same hash; return REQUEST_HASH_CONFLICT for a different
+                //  hash. See design/proposals/redis-idempotency-db-authoritative.md.
                 log.error("duplicated ledger txn: {}", ledgerTxn);
                 return Result.failure(LedgerServiceErrorCode.LEDGER_DUPLICATED, "duplicated ledger txn");
             }
@@ -146,6 +149,10 @@ public class PostLedgerProcessor {
             }
         }
 
+        // TODO(idempotency-db-authority): Persist the canonical request hash with the Ledger
+        //  transaction and compare it before treating this reference ID as a replay. A different
+        //  request using the same reference ID must remain a conflict after Redis loss or expiry.
+        //  Target design: design/proposals/redis-idempotency-db-authoritative.md.
         LedgerTxn txn = ledgerTxnRepository.getByRefId(req.getReferenceId());
         if (txn != null) {
             // set idemp to DONE when found ledger txn

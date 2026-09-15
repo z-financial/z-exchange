@@ -4,7 +4,7 @@
 
 This change extends the earlier ledger account migration and moves the active ledger post flow onto the refactored shared [`Result.java`](D:/TestProgram/Java/JavaEE/z-exchange/common-util/src/main/java/com/exchange/common/result/Result.java) model.
 
-This step supersedes the old "post flow still untouched" part of [`result-error-handling-ledger-account-migration.md`](D:/TestProgram/Java/JavaEE/z-exchange/ai/codex/refactor/result-util/result-error-handling-ledger-account-migration.md).
+This step supersedes the old "post flow still untouched" part of [`result-error-handling-ledger-account-migration.md`](D:/TestProgram/Java/JavaEE/z-exchange/engineering-notes/refactor/result-util/result-error-handling-ledger-account-migration.md).
 
 This follow-up also retires the old ledger-local result helpers:
 

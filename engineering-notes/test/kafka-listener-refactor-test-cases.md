@@ -3,7 +3,7 @@
 ## Scope
 
 These cases cover the behavior described in
-`codex/kafka/listener-refactor/feature/kafka-listener-refactor-change-scope.md`,
+`engineering-notes/feature/message/kafka-listener-refactor-change-scope.md`,
 especially section `6. Scenario Behavior`, plus additional cases found in the
 current `common-util` and `ledger-service` implementation.
 

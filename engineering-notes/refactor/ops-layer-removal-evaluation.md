@@ -2,7 +2,7 @@
 
 ## 1. Scope reviewed
 - Read first:
-  - `ai/codex/refactor/cache-component-refactor-evaluation.md`
+  - `engineering-notes/refactor/cache-component-refactor-evaluation.md`
 - Reviewed Ops interfaces:
   - `common-util/src/main/java/com/exchange/common/redis/cache/ops/ReadOps.java`
   - `common-util/src/main/java/com/exchange/common/redis/cache/ops/RawWriteOps.java`

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="430" viewBox="0 0 1120 430" role="img" aria-labelledby="title desc">
+  <title id="title">Wallet transaction and asynchronous settlement lifecycle</title>
+  <desc id="desc">A Wallet request is normalized into actions, committed with an optional Ledger command outbox, and Ledger-backed work is finalized from a success reply.</desc>
+  <defs><style>.bg{fill:#f8fafc}.box{fill:#fff;stroke:#334155;stroke-width:2;rx:12}.async{fill:#eff6ff;stroke:#2563eb;stroke-width:2;rx:12}.local{fill:#ecfdf5;stroke:#059669;stroke-width:2;rx:12}.t{font:600 16px system-ui;fill:#0f172a}.s{font:13px system-ui;fill:#475569}.a{stroke:#64748b;stroke-width:2;fill:none;marker-end:url(#m)}.aa{stroke:#2563eb;stroke-width:2;fill:none;marker-end:url(#mb)}</style><marker id="m" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0l8 4-8 4z" fill="#64748b"/></marker><marker id="mb" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0l8 4-8 4z" fill="#2563eb"/></marker></defs>
+  <rect class="bg" width="1120" height="430"/>
+  <text class="t" x="40" y="42" font-size="22">Wallet owns the business state; Ledger records the accounting result</text>
+  <rect class="box" x="40" y="95" width="190" height="105"/><text class="t" x="60" y="125">Wallet RPC</text><text class="s" x="60" y="151">atomic / reserve / apply</text><text class="s" x="60" y="174">validate and deduplicate</text>
+  <rect class="box" x="280" y="95" width="210" height="105"/><text class="t" x="300" y="125">Normalize actions</text><text class="s" x="300" y="151">reserve / consume / release</text><text class="s" x="300" y="174">transfer-out / transfer-in</text>
+  <rect class="local" x="540" y="75" width="230" height="145"/><text class="t" x="560" y="108">Wallet DB transaction</text><text class="s" x="560" y="135">balances + reservations</text><text class="s" x="560" y="158">transaction + actions</text><text class="s" x="560" y="181">optional command outbox</text><text class="s" x="560" y="204">COMPLETED or PENDING</text>
+  <path class="a" d="M230 148h50"/><path class="a" d="M490 148h50"/>
+  <rect class="local" x="840" y="70" width="220" height="90"/><text class="t" x="860" y="103">Local completion</text><text class="s" x="860" y="129">reserve or pure release</text><path class="a" d="M770 115h70"/>
+  <rect class="async" x="540" y="285" width="230" height="95"/><text class="t" x="560" y="318">Kafka → Ledger</text><text class="s" x="560" y="344">durable command outbox</text><text class="s" x="560" y="365">double-entry posting</text>
+  <rect class="async" x="840" y="270" width="220" height="125"/><text class="t" x="860" y="303">Reply finalization</text><text class="s" x="860" y="329">settle reservations</text><text class="s" x="860" y="352">apply transfer balances</text><text class="s" x="860" y="375">PENDING → COMPLETED</text>
+  <path class="aa" d="M655 220v65"/><path class="aa" d="M770 333h70"/>
+</svg>

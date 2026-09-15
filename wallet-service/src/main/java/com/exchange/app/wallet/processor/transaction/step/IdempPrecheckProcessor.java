@@ -126,7 +126,11 @@ public class IdempPrecheckProcessor {
     }
 
     private WalletTransaction idempDbCheck(ServiceIdPb serviceIdPb, String idempotencyKey) {
-        // TODO add hash check here
+        // TODO(idempotency-db-authority): Persist the canonical request hash with Wallet's DB
+        //  idempotency record and compare it on every DB fallback/replay. The same initiator/key with
+        //  the same hash must replay the stored result; a different hash must return HASH_CONFLICT even
+        //  after Redis loss or expiry. Target design:
+        //  design/proposals/redis-idempotency-db-authoritative.md.
         ServiceId serviceId = EnumPbMappers.serviceIdPbMapper.to(serviceIdPb);
         return walletTransactionManager.selectByIdempotencyKey(serviceId, idempotencyKey);
     }

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="650" viewBox="0 0 1280 650" role="img" aria-labelledby="title desc">
+  <title id="title">Ledger posting correctness flow</title>
+  <desc id="desc">A posting request is validated for per-asset debit-credit equality, account references are resolved, and a transaction header plus all entries are committed atomically.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#475569"/></marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.12"/></filter>
+    <style>
+      .title{font:700 28px 'Segoe UI',Arial,sans-serif;fill:#0f172a}.subtitle{font:400 15px 'Segoe UI',Arial,sans-serif;fill:#475569}.box-title{font:700 16px 'Segoe UI',Arial,sans-serif;fill:#0f172a}.body{font:400 14px 'Segoe UI',Arial,sans-serif;fill:#334155}.small{font:400 13px 'Segoe UI',Arial,sans-serif;fill:#475569}.badge{font:700 12px 'Segoe UI',Arial,sans-serif;fill:#fff}.arrow{stroke:#475569;stroke-width:2;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1280" height="650" rx="18" fill="#f8fafc"/>
+  <text x="60" y="56" class="title">Balanced request → atomic journal append</text>
+  <text x="60" y="84" class="subtitle">Application validation establishes journal shape; database atomicity commits the complete entry set.</text>
+
+  <rect x="55" y="130" width="235" height="130" rx="14" fill="#fff" stroke="#cbd5e1" filter="url(#shadow)"/>
+  <rect x="75" y="149" width="86" height="24" rx="12" fill="#334155"/><text x="118" y="166" text-anchor="middle" class="badge">REQUEST</text>
+  <text x="75" y="201" class="box-title">Posting command</text><text x="75" y="225" class="small">reference · description</text><text x="75" y="246" class="small">account ref · asset · side · amount</text>
+
+  <rect x="335" y="120" width="270" height="150" rx="14" fill="#eff6ff" stroke="#93c5fd" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="355" y="139" width="122" height="24" rx="12" fill="#2563eb"/><text x="416" y="156" text-anchor="middle" class="badge">APPLICATION</text>
+  <text x="355" y="191" class="box-title">Validate journal shape</text><text x="355" y="216" class="small">non-zero amount · known direction</text><text x="355" y="237" class="small">≥1 debit and ≥1 credit</text><text x="355" y="258" class="small">Σ debit = Σ credit per asset</text>
+
+  <rect x="650" y="130" width="245" height="130" rx="14" fill="#f0fdfa" stroke="#99f6e4" filter="url(#shadow)"/>
+  <rect x="670" y="149" width="120" height="24" rx="12" fill="#0f766e"/><text x="730" y="166" text-anchor="middle" class="badge">REFERENCE</text>
+  <text x="670" y="201" class="box-title">Resolve accounts</text><text x="670" y="225" class="small">external accountRef</text><text x="670" y="246" class="small">→ internal accountId</text>
+
+  <rect x="940" y="120" width="285" height="150" rx="14" fill="#0f172a" filter="url(#shadow)"/>
+  <rect x="960" y="139" width="86" height="24" rx="12" fill="#7c3aed"/><text x="1003" y="156" text-anchor="middle" class="badge">MYSQL</text>
+  <text x="960" y="191" class="box-title" style="fill:#fff">One DB transaction</text><text x="960" y="216" class="small" style="fill:#cbd5e1">insert ledger_transactions</text><text x="960" y="237" class="small" style="fill:#cbd5e1">batch insert ledger_entries</text><text x="960" y="258" class="small" style="fill:#cbd5e1">commit all or roll back all</text>
+  <path d="M290 195 L327 195" class="arrow"/><path d="M605 195 L642 195" class="arrow"/><path d="M895 195 L932 195" class="arrow"/>
+
+  <rect x="55" y="330" width="1170" height="240" rx="15" fill="#ecfdf5" stroke="#86efac" stroke-width="2"/>
+  <text x="80" y="368" class="box-title">What the current path guarantees</text>
+  <text x="80" y="402" class="body">• Request-level equality is checked independently per asset.</text>
+  <text x="80" y="431" class="body">• Header and complete submitted entry batch are one atomic write unit.</text>
+  <text x="80" y="460" class="body">• PK/UK constraints protect generated and business identities.</text>
+  <text x="80" y="489" class="body">• Ledger records facts; Wallet owns spend and reservation decisions.</text>
+  <text x="80" y="530" class="small">Idempotent replay is owned by D-008, not by this validity boundary.</text>
+
+</svg>

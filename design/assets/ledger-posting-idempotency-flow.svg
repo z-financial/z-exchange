@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="590" viewBox="0 0 1280 590" role="img" aria-labelledby="title desc">
+  <title id="title">Ledger posting idempotency and replay decision flow</title>
+  <desc id="desc">Ledger validates a request, coordinates ownership and replay through Redis, checks MySQL for an admitted request, commits under a unique reference ID, and caches the accepted result.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#475569"/></marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.12"/></filter>
+    <style>.title{font:700 28px 'Segoe UI',Arial,sans-serif;fill:#0f172a}.subtitle{font:400 15px 'Segoe UI',Arial,sans-serif;fill:#475569}.box-title{font:700 16px 'Segoe UI',Arial,sans-serif;fill:#0f172a}.body{font:400 14px 'Segoe UI',Arial,sans-serif;fill:#334155}.small{font:400 13px 'Segoe UI',Arial,sans-serif;fill:#475569}.badge{font:700 12px 'Segoe UI',Arial,sans-serif;fill:#fff}.arrow{stroke:#475569;stroke-width:2;fill:none;marker-end:url(#arrow)}.dash{stroke:#64748b;stroke-width:2;stroke-dasharray:7 6;fill:none;marker-end:url(#arrow)}</style>
+  </defs>
+  <rect width="1280" height="720" rx="18" fill="#f8fafc"/>
+  <text x="55" y="54" class="title">Redis coordinates; MySQL chooses the durable winner</text>
+  <text x="55" y="82" class="subtitle">Redis coordinates request ownership and replay; MySQL persists the authoritative journal effect.</text>
+
+  <rect x="55" y="120" width="190" height="96" rx="14" fill="#fff" stroke="#cbd5e1" filter="url(#shadow)"/><text x="75" y="153" class="box-title">Validated request</text><text x="75" y="178" class="small">referenceId + current hash</text><text x="75" y="198" class="small">new UUID owner token</text>
+  <rect x="295" y="112" width="235" height="112" rx="14" fill="#fef3c7" stroke="#fbbf24" stroke-width="2" filter="url(#shadow)"/><rect x="315" y="131" width="78" height="24" rx="12" fill="#b45309"/><text x="354" y="148" text-anchor="middle" class="badge">REDIS</text><text x="315" y="182" class="box-title">SET NX → PENDING</text><text x="315" y="205" class="small">fast ownership with expiring lease</text>
+  <path d="M245 168 L287 168" class="arrow"/>
+
+  <rect x="580" y="112" width="280" height="112" rx="14" fill="#eff6ff" stroke="#93c5fd" filter="url(#shadow)"/><text x="600" y="148" class="box-title">Existing visible Redis value</text><text x="600" y="177" class="body">same P → processing</text><text x="600" y="198" class="body">same A → replay txn ID</text><text x="600" y="219" class="body">different hash → conflict</text>
+  <path d="M530 145 L572 145" class="arrow"/>
+
+  <rect x="580" y="270" width="280" height="112" rx="14" fill="#fff7ed" stroke="#fdba74" filter="url(#shadow)"/><text x="600" y="306" class="box-title">Admitted request</text><text x="600" y="335" class="body">Query by referenceId in MySQL</text><text x="600" y="358" class="small">reuse durable result or create journal</text>
+  <path d="M412 224 L412 326 L572 326" class="arrow"/>
+
+  <rect x="925" y="250" width="300" height="150" rx="14" fill="#0f172a" filter="url(#shadow)"/><rect x="945" y="269" width="86" height="24" rx="12" fill="#7c3aed"/><text x="988" y="286" text-anchor="middle" class="badge">MYSQL</text><text x="945" y="322" class="box-title" style="fill:#fff">Authoritative effect identity</text><text x="945" y="348" class="small" style="fill:#cbd5e1">row exists → DB replay</text><text x="945" y="370" class="small" style="fill:#cbd5e1">absent → atomic journal append</text><text x="945" y="392" class="small" style="fill:#cbd5e1">unique referenceId per effect</text>
+  <path d="M860 326 L917 326" class="arrow"/>
+
+  <rect x="925" y="450" width="300" height="100" rx="14" fill="#ecfdf5" stroke="#86efac" filter="url(#shadow)"/><text x="945" y="486" class="box-title">Post-commit completion</text><text x="945" y="513" class="body">Cache ACCEPTED result</text><text x="945" y="536" class="small">future matching calls replay txn ID</text>
+  <path d="M1075 400 L1075 442" class="arrow"/>
+
+</svg>

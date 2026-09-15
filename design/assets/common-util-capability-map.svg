@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Common-util reusable infrastructure capability map</title>
+  <desc id="desc">Wallet and Ledger compose common result, database, Redis idempotency, cache, Kafka outbox, and observability capabilities. Those capabilities integrate with MySQL, Redis, Kafka, Micrometer, Prometheus, and Grafana while services retain domain decisions.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L0 6 L9 3 z" fill="#64748b"/></marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#0f172a" flood-opacity=".12"/></filter>
+    <style>
+      .title{font:700 28px 'Segoe UI',Arial,sans-serif;fill:#0f172a}.subtitle{font:400 15px 'Segoe UI',Arial,sans-serif;fill:#475569}
+      .heading{font:700 18px 'Segoe UI',Arial,sans-serif;fill:#0f172a}.body{font:400 14px 'Segoe UI',Arial,sans-serif;fill:#334155}
+      .small{font:400 13px 'Segoe UI',Arial,sans-serif;fill:#475569}.badge{font:700 12px 'Segoe UI',Arial,sans-serif;fill:#fff;letter-spacing:.35px}
+      .line{stroke:#64748b;stroke-width:2;fill:none;marker-end:url(#arrow)}.dash{stroke:#94a3b8;stroke-width:2;stroke-dasharray:7 6;fill:none}
+    </style>
+  </defs>
+  <rect width="1280" height="720" rx="18" fill="#f8fafc"/>
+  <text x="60" y="52" class="title">One infrastructure toolkit, composed by two services</text>
+  <text x="60" y="79" class="subtitle">Common-util standardizes cross-cutting mechanisms; Wallet and Ledger retain their own business state, invariants, and public contracts.</text>
+
+  <rect x="130" y="105" width="410" height="88" rx="14" fill="#eff6ff" stroke="#93c5fd" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="150" y="123" width="80" height="23" rx="11" fill="#2563eb"/><text x="190" y="139" text-anchor="middle" class="badge">WALLET</text>
+  <text x="150" y="169" class="heading">Balances, reservations, transaction decisions</text>
+  <rect x="740" y="105" width="410" height="88" rx="14" fill="#f0fdfa" stroke="#5eead4" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="760" y="123" width="80" height="23" rx="11" fill="#0f766e"/><text x="800" y="139" text-anchor="middle" class="badge">LEDGER</text>
+  <text x="760" y="169" class="heading">Journal posting and accounting records</text>
+
+  <path d="M335 193 L335 230" class="line"/><path d="M945 193 L945 230" class="line"/>
+  <rect x="60" y="238" width="1160" height="304" rx="18" fill="#fff" stroke="#cbd5e1" stroke-width="2" filter="url(#shadow)"/>
+  <text x="90" y="273" class="heading">common-util</text><text x="212" y="273" class="small">shared mechanisms and conventions</text>
+
+  <rect x="90" y="300" width="330" height="94" rx="13" fill="#f5f3ff" stroke="#c4b5fd"/>
+  <text x="110" y="329" class="heading">Result + error contract</text><text x="110" y="353" class="body">Explicit outcomes, typed exceptions,</text><text x="110" y="374" class="body">stable service boundary mapping</text>
+  <rect x="475" y="300" width="330" height="94" rx="13" fill="#eff6ff" stroke="#93c5fd"/>
+  <text x="495" y="329" class="heading">Database foundation</text><text x="495" y="353" class="body">Result-aware transactions, repositories,</text><text x="495" y="374" class="body">exception translation, SQL metrics</text>
+  <rect x="860" y="300" width="330" height="94" rx="13" fill="#fff7ed" stroke="#fdba74"/>
+  <text x="880" y="329" class="heading">Kafka + outbox reliability</text><text x="880" y="353" class="body">Durable rows, broker-ack publishing,</text><text x="880" y="374" class="body">listener retry and scheduled recovery</text>
+
+  <rect x="90" y="423" width="330" height="94" rx="13" fill="#f0fdfa" stroke="#5eead4"/>
+  <text x="110" y="452" class="heading">Redis idempotency</text><text x="110" y="476" class="body">PENDING/ACCEPTED coordination,</text><text x="110" y="497" class="body">hash checks and owner-token cleanup</text>
+  <rect x="475" y="423" width="330" height="94" rx="13" fill="#ecfdf5" stroke="#86efac"/>
+  <text x="495" y="452" class="heading">Cache strategies</text><text x="495" y="476" class="body">Raw and versioned L2, CAS/tombstone,</text><text x="495" y="497" class="body">optional Redisson client-side L1</text>
+  <rect x="860" y="423" width="330" height="94" rx="13" fill="#fdf2f8" stroke="#f9a8d4"/>
+  <text x="880" y="452" class="heading">Observability</text><text x="880" y="476" class="body">Transport, business, DB, Redis, cache,</text><text x="880" y="497" class="body">Kafka and outbox measurements</text>
+
+  <path d="M255 542 L255 583" class="line"/><path d="M640 542 L640 583" class="line"/><path d="M1025 542 L1025 583" class="line"/>
+  <rect x="90" y="592" width="260" height="76" rx="13" fill="#0f172a"/><text x="220" y="623" text-anchor="middle" class="heading" style="fill:#fff">MySQL</text><text x="220" y="646" text-anchor="middle" class="small" style="fill:#cbd5e1">authoritative durable state</text>
+  <rect x="380" y="592" width="260" height="76" rx="13" fill="#7f1d1d"/><text x="510" y="623" text-anchor="middle" class="heading" style="fill:#fff">Redis</text><text x="510" y="646" text-anchor="middle" class="small" style="fill:#fecaca">coordination and acceleration</text>
+  <rect x="670" y="592" width="260" height="76" rx="13" fill="#78350f"/><text x="800" y="623" text-anchor="middle" class="heading" style="fill:#fff">Kafka</text><text x="800" y="646" text-anchor="middle" class="small" style="fill:#fde68a">delivery may repeat</text>
+  <rect x="960" y="592" width="230" height="76" rx="13" fill="#581c87"/><text x="1075" y="623" text-anchor="middle" class="heading" style="fill:#fff">Metrics stack</text><text x="1075" y="646" text-anchor="middle" class="small" style="fill:#e9d5ff">Micrometer → Prometheus</text>
+</svg>

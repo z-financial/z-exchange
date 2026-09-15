@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="610" viewBox="0 0 1200 610" role="img" aria-labelledby="title desc">
+  <title id="title">Shared application observability layers</title>
+  <desc id="desc">Wallet and Ledger emit business and common infrastructure metrics through Micrometer and Actuator to Prometheus and Grafana, while logs provide explicit identifiers without distributed tracing.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset="1" stop-color="#ecfeff"/></linearGradient>
+    <filter id="shadow" x="-10%" y="-15%" width="120%" height="140%"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#334155" flood-opacity="0.16"/></filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#475569"/></marker>
+    <style>
+      .head{font:700 22px 'Segoe UI',Arial,sans-serif;fill:#0f172a}.label{font:600 17px 'Segoe UI',Arial,sans-serif;fill:#0f172a}.body{font:14px 'Segoe UI',Arial,sans-serif;fill:#334155}.small{font:13px 'Segoe UI',Arial,sans-serif;fill:#475569}.line{stroke:#475569;stroke-width:2.4;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1200" height="610" rx="22" fill="url(#bg)"/>
+  <text x="45" y="44" class="head">Layered signals localize latency and failure without high-cardinality request labels</text>
+
+  <rect x="45" y="78" width="260" height="180" rx="16" fill="#ffffff" stroke="#94a3b8" filter="url(#shadow)"/>
+  <text x="70" y="113" class="label">Wallet / Ledger</text>
+  <text x="70" y="143" class="body">gRPC and Kafka ingress</text>
+  <text x="70" y="168" class="body">service business outcomes</text>
+  <text x="70" y="193" class="body">plain-text application logs</text>
+  <text x="70" y="224" class="small">event/command IDs in log messages</text>
+
+  <rect x="380" y="68" width="405" height="250" rx="16" fill="#eff6ff" stroke="#60a5fa" filter="url(#shadow)"/>
+  <text x="405" y="104" class="label">Common Micrometer instrumentation</text>
+  <text x="405" y="137" class="body">gRPC: active calls · duration · status</text>
+  <text x="405" y="166" class="body">DB: transaction · statement · errors</text>
+  <text x="405" y="195" class="body">Redis/cache/idempotency: latency · result · error</text>
+  <text x="405" y="224" class="body">Kafka: publish · listener · processing delay · DLT</text>
+  <text x="405" y="253" class="body">Outbox: creation-to-publish-attempt delay</text>
+  <text x="405" y="289" class="small">constant outcomes; business identifiers excluded</text>
+
+  <rect x="860" y="78" width="295" height="180" rx="16" fill="#ecfdf5" stroke="#34d399" filter="url(#shadow)"/>
+  <text x="885" y="113" class="label">Actuator / framework</text>
+  <text x="885" y="143" class="body">Prometheus endpoint</text>
+  <text x="885" y="168" class="body">application common tag</text>
+  <text x="885" y="193" class="body">JVM · process · Hikari meters</text>
+  <text x="885" y="224" class="small">histograms and configured buckets</text>
+
+  <rect x="305" y="390" width="260" height="115" rx="16" fill="#fff7ed" stroke="#fb923c" filter="url(#shadow)"/>
+  <text x="330" y="427" class="label">Prometheus</text>
+  <text x="330" y="456" class="body">scrapes both application endpoints</text>
+  <text x="330" y="482" class="small">job / instance labels</text>
+
+  <rect x="650" y="390" width="260" height="115" rx="16" fill="#f5f3ff" stroke="#a78bfa" filter="url(#shadow)"/>
+  <text x="675" y="427" class="label">Grafana</text>
+  <text x="675" y="456" class="body">transport · data · messaging</text>
+  <text x="675" y="482" class="body">runtime · service dashboards</text>
+
+  <path d="M305 160 L380 160" class="line"/>
+  <path d="M785 160 L860 160" class="line"/>
+  <path d="M1005 258 C1005 350 565 345 510 390" class="line"/>
+  <path d="M565 448 L650 448" class="line"/>
+
+  <rect x="45" y="544" width="1110" height="40" rx="10" fill="#e2e8f0"/>
+  <text x="68" y="570" class="body">Current boundary: application metrics + local logs. Distributed traces, centralized logs, infrastructure exporters, and consumer lag are future work.</text>
+</svg>

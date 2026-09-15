@@ -1,9 +1,0 @@
-Result vs Exception
-Use Result for
-1. business error or rejection
-2. retriable error
-
-Throw Exception for
-1. logic error
-2. unexpected error (for example, invalid enum after validation)
-3. infra problem (like db crush)

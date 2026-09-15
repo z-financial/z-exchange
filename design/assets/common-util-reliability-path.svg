@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="500" viewBox="0 0 1280 500" role="img" aria-labelledby="title desc">
+  <title id="title">Common-util reliability path</title>
+  <desc id="desc">A service checks Redis idempotency, performs authoritative business changes and outbox insertion in MySQL, updates cache after commit, and publishes through Kafka with scheduled outbox recovery. Result and observability span all stages.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L0 6 L9 3 z" fill="#475569"/></marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#0f172a" flood-opacity=".12"/></filter>
+    <style>.title{font:700 27px 'Segoe UI',Arial,sans-serif;fill:#0f172a}.subtitle{font:400 15px 'Segoe UI',Arial,sans-serif;fill:#475569}.heading{font:700 16px 'Segoe UI',Arial,sans-serif;fill:#0f172a}.body{font:400 13px 'Segoe UI',Arial,sans-serif;fill:#475569}.band{font:700 14px 'Segoe UI',Arial,sans-serif;fill:#fff}.line{stroke:#475569;stroke-width:2;fill:none;marker-end:url(#arrow)}.dash{stroke:#64748b;stroke-width:2;stroke-dasharray:7 6;fill:none;marker-end:url(#arrow)}</style>
+  </defs>
+  <rect width="1280" height="500" rx="18" fill="#f8fafc"/>
+  <text x="60" y="52" class="title">Fast paths accelerate; durable state decides</text>
+  <text x="60" y="79" class="subtitle">The service composes the pieces. Redis and immediate publish can fail without replacing MySQL as the correctness boundary.</text>
+
+  <rect x="55" y="125" width="180" height="102" rx="14" fill="#fff" stroke="#cbd5e1" filter="url(#shadow)"/>
+  <text x="75" y="157" class="heading">Service request</text><text x="75" y="181" class="body">Validate domain input</text><text x="75" y="202" class="body">Return Result&lt;T&gt;</text>
+  <rect x="275" y="125" width="200" height="102" rx="14" fill="#f0fdfa" stroke="#5eead4" filter="url(#shadow)"/>
+  <text x="295" y="157" class="heading">Redis idempotency</text><text x="295" y="181" class="body">Claim or replay fast</text><text x="295" y="202" class="body">Failure → DB fallback</text>
+  <rect x="515" y="110" width="250" height="132" rx="14" fill="#eff6ff" stroke="#60a5fa" stroke-width="2" filter="url(#shadow)"/>
+  <text x="535" y="143" class="heading">One DB transaction</text><text x="535" y="168" class="body">Service-owned business writes</text><text x="535" y="190" class="body">DB uniqueness / guarded updates</text><text x="535" y="212" class="body">Durable outbox when required</text>
+  <rect x="805" y="125" width="200" height="102" rx="14" fill="#fff7ed" stroke="#fdba74" filter="url(#shadow)"/>
+  <text x="825" y="157" class="heading">Kafka publisher</text><text x="825" y="181" class="body">Immediate broker send</text><text x="825" y="202" class="body">Scheduler retries PENDING</text>
+  <rect x="1045" y="125" width="180" height="102" rx="14" fill="#f5f3ff" stroke="#c4b5fd" filter="url(#shadow)"/>
+  <text x="1065" y="157" class="heading">Listener</text><text x="1065" y="181" class="body">Durable action first</text><text x="1065" y="202" class="body">Then manual ack</text>
+  <path d="M235 176 L267 176" class="line"/><path d="M475 176 L507 176" class="line"/><path d="M765 176 L797 176" class="line"/><path d="M1005 176 L1037 176" class="line"/>
+
+  <rect x="515" y="282" width="250" height="82" rx="13" fill="#ecfdf5" stroke="#86efac"/>
+  <text x="535" y="313" class="heading">Post-commit cache action</text><text x="535" y="337" class="body">Version CAS / tombstone / raw fill</text>
+  <path d="M640 242 L640 274" class="dash"/>
+  <rect x="805" y="282" width="200" height="82" rx="13" fill="#fffbeb" stroke="#fcd34d"/>
+  <text x="825" y="313" class="heading">Recovery source</text><text x="825" y="337" class="body">PENDING outbox row</text>
+  <path d="M905 282 L905 235" class="dash"/>
+
+  <rect x="55" y="411" width="1170" height="48" rx="12" fill="#581c87"/>
+  <text x="640" y="441" text-anchor="middle" class="band">Shared metrics observe each boundary; service business metrics supply semantic outcomes</text>
+</svg>

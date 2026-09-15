@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500" viewBox="0 0 1200 500" role="img" aria-labelledby="title desc">
+  <title id="title">Result and error propagation contract</title>
+  <desc id="desc">Expected outcomes flow through Result, typed exceptions escape rollback and transport-control boundaries, and service mappers normalize common errors before protobuf replies.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset="1" stop-color="#eef2ff"/></linearGradient>
+    <filter id="shadow" x="-10%" y="-15%" width="120%" height="140%"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#334155" flood-opacity="0.16"/></filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#475569"/></marker>
+    <style>
+      .head{font:700 22px 'Segoe UI',Arial,sans-serif;fill:#0f172a}.label{font:600 17px 'Segoe UI',Arial,sans-serif;fill:#0f172a}.body{font:14px 'Segoe UI',Arial,sans-serif;fill:#334155}.small{font:13px 'Segoe UI',Arial,sans-serif;fill:#475569}.line{stroke:#475569;stroke-width:2.4;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1200" height="500" rx="22" fill="url(#bg)"/>
+  <text x="48" y="45" class="head">One error vocabulary, three deliberate control-flow layers</text>
+
+  <rect x="45" y="88" width="250" height="125" rx="16" fill="#ffffff" stroke="#94a3b8" filter="url(#shadow)"/>
+  <text x="70" y="122" class="label">Operation / processor</text>
+  <text x="70" y="151" class="body">Expected outcome</text><text x="70" y="175" class="small">validation · conflict · replay</text>
+  <text x="70" y="198" class="body">Unexpected / infrastructure fault</text>
+
+  <rect x="395" y="72" width="300" height="135" rx="16" fill="#ecfdf5" stroke="#34d399" filter="url(#shadow)"/>
+  <text x="420" y="108" class="label">Result&lt;T&gt;</text>
+  <text x="420" y="137" class="body">success(value?)</text>
+  <text x="420" y="160" class="body">failure(errorCode, detail, scope)</text>
+  <text x="420" y="184" class="small">Caller inspects and propagates explicitly</text>
+
+  <rect x="395" y="260" width="300" height="145" rx="16" fill="#fff7ed" stroke="#fb923c" filter="url(#shadow)"/>
+  <text x="420" y="296" class="label">Typed runtime exception</text>
+  <text x="420" y="325" class="body">DbException · CacheException</text>
+  <text x="420" y="348" class="body">Kafka retry / DLT exception</text>
+  <text x="420" y="373" class="small">Escapes, rolls back, or selects adapter policy</text>
+
+  <rect x="795" y="88" width="350" height="155" rx="16" fill="#eff6ff" stroke="#60a5fa" filter="url(#shadow)"/>
+  <text x="820" y="124" class="label">Service boundary ownership</text>
+  <text x="820" y="153" class="body">WalletBoundaryErrorMapper</text>
+  <text x="820" y="176" class="body">LedgerBoundaryErrorMapper</text>
+  <text x="820" y="204" class="small">Common code → service-owned stable error</text>
+
+  <rect x="795" y="305" width="350" height="105" rx="16" fill="#f5f3ff" stroke="#a78bfa" filter="url(#shadow)"/>
+  <text x="820" y="341" class="label">Protobuf reply</text>
+  <text x="820" y="369" class="body">category · service message · detail</text>
+  <text x="820" y="392" class="small">Normally returned over gRPC status OK</text>
+
+  <path d="M295 138 L395 138" class="line"/>
+  <text x="310" y="125" class="small">normal path</text>
+  <path d="M295 183 C345 183 345 330 395 330" class="line"/>
+  <text x="308" y="255" class="small">escape path</text>
+  <path d="M695 140 L795 140" class="line"/>
+  <path d="M695 330 C750 330 740 190 795 190" class="line"/>
+  <path d="M970 243 L970 305" class="line"/>
+
+  <rect x="45" y="438" width="1100" height="38" rx="10" fill="#e2e8f0"/>
+  <text x="68" y="463" class="body">Retryable metadata informs policy; committed/unknown outcome and idempotency determine whether replay is actually safe.</text>
+</svg>

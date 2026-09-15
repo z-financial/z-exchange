@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="470" viewBox="0 0 1280 470" role="img" aria-labelledby="title desc">
+  <title id="title">Ledger asynchronous posting and durable reply lifecycle</title>
+  <desc id="desc">Wallet publishes a posting command, Ledger records the journal, persists a reply outbox before acknowledging the command, and delivers the reply to Wallet.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#475569"/></marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.12"/></filter>
+    <style>.title{font:700 28px 'Segoe UI',Arial,sans-serif;fill:#0f172a}.subtitle{font:400 15px 'Segoe UI',Arial,sans-serif;fill:#475569}.box-title{font:700 16px 'Segoe UI',Arial,sans-serif;fill:#0f172a}.body{font:400 13px 'Segoe UI',Arial,sans-serif;fill:#475569}.badge{font:700 12px 'Segoe UI',Arial,sans-serif;fill:#fff}.arrow{stroke:#475569;stroke-width:2;fill:none;marker-end:url(#arrow)}</style>
+  </defs>
+  <rect width="1280" height="470" rx="18" fill="#f8fafc"/>
+  <text x="55" y="56" class="title">Command in → journal committed → durable reply out</text>
+  <text x="55" y="84" class="subtitle">The journal commit and later durable reply are separate phases connected by idempotent processing.</text>
+
+  <rect x="45" y="135" width="190" height="125" rx="14" fill="#eff6ff" stroke="#93c5fd" filter="url(#shadow)"/>
+  <rect x="65" y="153" width="72" height="24" rx="12" fill="#2563eb"/><text x="101" y="170" text-anchor="middle" class="badge">WALLET</text>
+  <text x="65" y="205" class="box-title">Posting command</text><text x="65" y="231" class="body">transaction ID is command,</text><text x="65" y="251" class="body">reference, and partition key</text>
+
+  <rect x="280" y="135" width="190" height="125" rx="14" fill="#fef3c7" stroke="#fbbf24" filter="url(#shadow)"/>
+  <rect x="300" y="153" width="72" height="24" rx="12" fill="#b45309"/><text x="336" y="170" text-anchor="middle" class="badge">KAFKA</text>
+  <text x="300" y="205" class="box-title">Command listener</text><text x="300" y="231" class="body">parse envelope and invoke</text><text x="300" y="251" class="body">posting processor</text>
+
+  <rect x="515" y="125" width="225" height="145" rx="14" fill="#0f172a" filter="url(#shadow)"/>
+  <rect x="535" y="143" width="86" height="24" rx="12" fill="#7c3aed"/><text x="578" y="160" text-anchor="middle" class="badge">MYSQL</text>
+  <text x="535" y="197" class="box-title" style="fill:#fff">Journal transaction</text><text x="535" y="225" class="body" style="fill:#cbd5e1">header + complete entry batch</text><text x="535" y="248" class="body" style="fill:#cbd5e1">commit atomically</text>
+
+  <rect x="785" y="125" width="225" height="145" rx="14" fill="#ecfdf5" stroke="#86efac" filter="url(#shadow)"/>
+  <rect x="805" y="143" width="86" height="24" rx="12" fill="#047857"/><text x="848" y="160" text-anchor="middle" class="badge">OUTBOX</text>
+  <text x="805" y="197" class="box-title">Durable reply</text><text x="805" y="225" class="body">insert or verify reply intent</text><text x="805" y="248" class="body">then acknowledge command</text>
+
+  <rect x="1055" y="135" width="180" height="125" rx="14" fill="#f0fdfa" stroke="#99f6e4" filter="url(#shadow)"/>
+  <text x="1075" y="181" class="box-title">Wallet reply</text><text x="1075" y="209" class="body">publish by command ID</text><text x="1075" y="232" class="body">apply idempotently</text>
+
+  <path d="M235 198 L272 198" class="arrow"/><path d="M470 198 L507 198" class="arrow"/><path d="M740 198 L777 198" class="arrow"/><path d="M1010 198 L1047 198" class="arrow"/>
+
+  <rect x="280" y="330" width="730" height="82" rx="14" fill="#fff" stroke="#cbd5e1"/>
+  <text x="305" y="365" class="box-title">Delivery lifecycle</text>
+  <text x="305" y="391" class="body">Immediate publish reduces normal latency; the scheduled dispatcher handles eligible PENDING replies and finalizes acknowledged sends.</text>
+</svg>

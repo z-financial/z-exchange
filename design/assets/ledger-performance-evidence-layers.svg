@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="500" viewBox="0 0 1280 500" role="img" aria-labelledby="title desc">
+  <title id="title">Ledger performance evidence layers</title>
+  <desc id="desc">Client, gRPC, Ledger business, data-access, resource, and reconciliation evidence are correlated to diagnose throughput, latency, and correctness.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#475569"/></marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.12"/></filter>
+    <style>.title{font:700 28px 'Segoe UI',Arial,sans-serif;fill:#0f172a}.subtitle{font:400 15px 'Segoe UI',Arial,sans-serif;fill:#475569}.box-title{font:700 16px 'Segoe UI',Arial,sans-serif;fill:#0f172a}.body{font:400 13px 'Segoe UI',Arial,sans-serif;fill:#475569}.badge{font:700 12px 'Segoe UI',Arial,sans-serif;fill:#fff}.arrow{stroke:#475569;stroke-width:2;fill:none;marker-end:url(#arrow)}.dash{stroke:#64748b;stroke-width:2;stroke-dasharray:7 6;fill:none;marker-end:url(#arrow)}</style>
+  </defs>
+  <rect width="1280" height="500" rx="18" fill="#f8fafc"/>
+  <text x="55" y="56" class="title">Correlate the request path, resources, and persisted result</text>
+  <text x="55" y="84" class="subtitle">Each layer answers a different question; aligned evidence turns symptoms into a bounded diagnosis.</text>
+
+  <rect x="45" y="140" width="190" height="125" rx="14" fill="#eff6ff" stroke="#93c5fd" filter="url(#shadow)"/>
+  <rect x="65" y="158" width="52" height="24" rx="12" fill="#2563eb"/><text x="91" y="175" text-anchor="middle" class="badge">K6</text>
+  <text x="65" y="211" class="box-title">Client demand</text><text x="65" y="237" class="body">offered · completed</text><text x="65" y="257" class="body">latency · errors · VUs</text>
+
+  <rect x="285" y="140" width="190" height="125" rx="14" fill="#fff" stroke="#cbd5e1" filter="url(#shadow)"/>
+  <text x="305" y="181" class="box-title">gRPC boundary</text><text x="305" y="211" class="body">server duration · status</text><text x="305" y="234" class="body">active requests</text>
+
+  <rect x="525" y="130" width="205" height="145" rx="14" fill="#ecfdf5" stroke="#86efac" filter="url(#shadow)"/>
+  <rect x="545" y="148" width="72" height="24" rx="12" fill="#047857"/><text x="581" y="165" text-anchor="middle" class="badge">LEDGER</text>
+  <text x="545" y="202" class="box-title">Business path</text><text x="545" y="230" class="body">operation · ingress · outcome</text><text x="545" y="253" class="body">created · replay · entry shape</text>
+
+  <rect x="780" y="140" width="200" height="125" rx="14" fill="#fef3c7" stroke="#fbbf24" filter="url(#shadow)"/>
+  <text x="800" y="181" class="box-title">Data access</text><text x="800" y="211" class="body">transaction · SQL · Redis</text><text x="800" y="234" class="body">duration · result · error</text>
+
+  <rect x="1030" y="140" width="205" height="125" rx="14" fill="#f5f3ff" stroke="#c4b5fd" filter="url(#shadow)"/>
+  <text x="1050" y="181" class="box-title">Runtime resources</text><text x="1050" y="211" class="body">Hikari · JVM · process</text><text x="1050" y="234" class="body">active · pending · GC</text>
+
+  <path d="M235 202 L277 202" class="arrow"/><path d="M475 202 L517 202" class="arrow"/><path d="M730 202 L772 202" class="arrow"/><path d="M980 202 L1022 202" class="arrow"/>
+
+  <rect x="285" y="350" width="695" height="92" rx="14" fill="#0f172a" filter="url(#shadow)"/>
+  <text x="310" y="387" class="box-title" style="fill:#fff">Persisted correctness evidence</text>
+  <text x="310" y="416" class="body" style="fill:#cbd5e1">k6 checks duplicate result identity; SQL checks balanced transactions and exact expected entries.</text>
+  <path d="M627 275 L627 342" class="dash"/>
+</svg>
