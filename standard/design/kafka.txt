@@ -1,2 +1,0 @@
-bin/kafka-topics.sh --bootstrap-server 192.168.52.100:9092 --create --topic wallet.ledger.command.posting --partitions 3 --replication-factor 1
-bin/kafka-topics.sh --bootstrap-server 192.168.52.100:9092 --create --topic ledger.wallet.reply.posting --partitions 3 --replication-factor 1

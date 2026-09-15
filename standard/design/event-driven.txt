@@ -1,9 +1,0 @@
-topic naming strategy:
-<domain>.<service>.<type>.<name>
-domain: the producer, like "wallet"
-service: the consumer
-type: command/reply/event
-    command can fail and need retry if allowed
-    event should not be retried, once sent the progress finishes
-
-dlq: dlq_topic = topic + ".dlq"
