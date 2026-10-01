@@ -36,6 +36,12 @@ public class CommandContainerRegister {
         factory.setConsumerFactory(consumerFactory);
         factory.setConcurrency(3);
         ContainerProperties containerProperties = factory.getContainerProperties();
+        /*
+         * MANUAL deliberately amortizes offset commits across the records returned by a poll.
+         * Durable processing and idempotency make poll-batch replay safe; MANUAL_IMMEDIATE
+         * would reduce that replay window at the cost of potentially committing every record.
+         * See design/infrastructure/kafka-outbox-reliability.md#manual-versus-manual-immediate.
+         */
         containerProperties.setAckMode(ContainerProperties.AckMode.MANUAL);
         containerProperties.setDeliveryAttemptHeader(true);
         return factory;

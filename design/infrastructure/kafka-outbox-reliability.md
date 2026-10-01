@@ -92,6 +92,19 @@ Both service listeners currently use manual acknowledgment, delivery-attempt hea
 
 The ack-failure marker is an optimization, not the correctness foundation. Its propagation through real retry topics is covered only by unit tests today. If the marker is absent, service business idempotency and reply-outbox same-intent verification must tolerate reprocessing. That fallback is currently incomplete because Ledger can rebuild the same success event ID with different payload detail on idempotent replay.
 
+### Manual versus manual immediate
+
+The listener container deliberately uses Spring Kafka's `MANUAL` acknowledgment mode. Both manual modes let application code place the acknowledgment after its durable processing boundary, but they differ in when Spring commits the acknowledged offset:
+
+| Mode | Commit behavior | Frequent-path cost | Failure window |
+|---|---|---|---|
+| `MANUAL` | `acknowledge()` queues the offset; Spring applies batch-like semantics and commits pending offsets after the records returned by the poll have been processed. | Amortizes offset-commit overhead across a poll. | A crash or rebalance before the batch commit can redeliver multiple records whose durable work already completed. |
+| `MANUAL_IMMEDIATE` | `acknowledge()` commits immediately when called on the consumer thread; calls from another thread fall back to queued behavior. | Can perform an offset commit for every record and add a broker round trip to the hot path when synchronous commits are used. | Narrows the usual redelivery window to the record being acknowledged, but cannot eliminate duplicates around processing and commit failures. |
+
+`MANUAL` is preferred because duplicate-safe business handling and reply-outbox verification already make poll-batch replay an accepted at-least-once outcome, while acknowledgment occurs on every successful record path. Batching the resulting offset commits favors steady-state throughput over minimizing the uncommon replay set. This choice does not weaken the durable-before-ack rule: handlers must finish their database work, and reply-producing paths must insert or verify the outbox action, before calling `acknowledge()`.
+
+Because `MANUAL` normally defers the broker commit, a successful `acknowledge()` call records local commit intent rather than proving that Kafka stored the offset at that instant. A broker commit failure that occurs later is not reliably catchable by the listener's `acknowledge()` call. Correctness therefore continues to depend on redelivery-safe processing; the ack-failure marker is only a best-effort optimization. Reconsider `MANUAL_IMMEDIATE` only if measured replay cost or a tighter per-record commit boundary outweighs the additional commit traffic.
+
 Envelope parsing validates only protobuf syntax. The common listener does not require nonblank `event_id`, `command_id`, or `event_type`; service handlers reject unsupported types and malformed inner payloads, but there is no shared envelope-identity validation before a parseable failure can become a durable reply.
 
 Retry is part of the common listener's normal contract, not an exceptional add-on. The listener cannot supply business idempotency because it does not own domain identities or state transitions. Its users must make both successful handler effects and any durable reply action safe under duplicate delivery, source-ack failure, retry-topic delivery, and later re-drive. DLT and retry-exhaustion observations may drive alerts and metrics, but business recovery must not depend on receiving either signal.

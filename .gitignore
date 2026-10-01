@@ -44,3 +44,4 @@ grpc-proto/wallet-proto/src/main/java
 /logs/
 /wallet-service/logs/
 /ledger-service/logs/
+/draft/

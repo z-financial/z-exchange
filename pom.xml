@@ -19,7 +19,6 @@
         <module>ledger-service</module>
         <module>wallet-service</module>
         <module>grpc-proto</module>
-        <module>client-test</module>
         <module>common-util</module>
         <module>grpc-proto/ledger-proto</module>
         <module>grpc-proto/common-proto</module>
@@ -129,6 +128,12 @@
             <dependency>
                 <groupId>com.exchange</groupId>
                 <artifactId>wallet-service</artifactId>
+                <version>1.0-SNAPSHOT</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.zed.idgen</groupId>
+                <artifactId>z-id-generator</artifactId>
                 <version>1.0-SNAPSHOT</version>
             </dependency>
 

@@ -99,6 +99,27 @@ management:
         zexchange.db.transaction.duration: 5ms,10ms,25ms,50ms,100ms,250ms,500ms,1s,3s,10s
 
 app:
+  id-generator:
+    # Opt-in until the shared z_id_generator schema has been provisioned.
+    enabled: ${ID_GENERATOR_ENABLED:false}
+    domain-name: ${ID_GENERATOR_DOMAIN:z-exchange}
+    generator-name: ${ID_GENERATOR_NAME:ledger}
+    # Must be <= 27 characters; the lease layer appends a UUID owner token.
+    server-instance-id: ${ID_GENERATOR_INSTANCE_ID:ledger}
+    default-statement-timeout-seconds: ${ID_GENERATOR_DB_STATEMENT_TIMEOUT_SECONDS:5}
+    lease-request-timeout-seconds: ${ID_GENERATOR_LEASE_TIMEOUT_SECONDS:2}
+    data-source:
+      jdbc-url: ${ID_GENERATOR_DB_URL:jdbc:mysql://localhost:3306/z_id_generator?serverTimezone=UTC&characterEncoding=utf-8&useSSL=false}
+      username: ${ID_GENERATOR_DB_USERNAME:root}
+      password: ${ID_GENERATOR_DB_PASSWORD:0000}
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      maximum-pool-size: ${ID_GENERATOR_DB_MAX_POOL_SIZE:4}
+      minimum-idle: ${ID_GENERATOR_DB_MIN_IDLE:1}
+      connection-timeout-millis: ${ID_GENERATOR_DB_CONNECTION_TIMEOUT_MS:2000}
+      validation-timeout-millis: ${ID_GENERATOR_DB_VALIDATION_TIMEOUT_MS:1000}
+      max-lifetime-millis: ${ID_GENERATOR_DB_MAX_LIFETIME_MS:1500000}
+      keepalive-time-millis: ${ID_GENERATOR_DB_KEEPALIVE_TIME_MS:300000}
+
   db:
     query:
       default-batch-size: 3

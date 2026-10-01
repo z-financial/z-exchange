@@ -111,6 +111,16 @@
             <artifactId>common-proto</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>com.zed.idgen</groupId>
+            <artifactId>z-id-generator</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+        </dependency>
+
 
 
     </dependencies>
