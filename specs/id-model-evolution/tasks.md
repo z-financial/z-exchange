@@ -1,13 +1,14 @@
-# Agile Stories — Internal ID and Typed Reference Evolution
+# Implementation Tasks — Internal ID and Typed Reference Evolution
 
-Source: [spec.md](./spec.md)
+Source: [SPEC](./spec.md) | Jira epic: [ZEX-2](https://szy2425973547.atlassian.net/browse/ZEX-2)
 
-## Story 1 — Define the identity foundation
+## Task 1 — Define the identity foundation
 
-As a service developer, I want a shared typed-reference codec and generated internal-ID model so that Wallet and
-Ledger use one unambiguous identity contract.
+Jira story: [ZEX-3](https://szy2425973547.atlassian.net/browse/ZEX-3)
 
-Acceptance criteria:
+Implement the shared typed-reference codec and generated internal-ID persistence contract.
+
+Done when:
 
 - Stable type codes, encoding, checksum, maximum length, and validation errors are defined.
 - The codec creates and parses `<TYPE>-<ENC_INTERNAL_ID>-<CHK>` references locally and deterministically.
@@ -15,12 +16,13 @@ Acceptance criteria:
 - MyBatis round-trips `1`, representative values, and `Long.MAX_VALUE` without sign or precision changes.
 - The diagnostic generator decoder is available, but production business logic does not depend on decoded fields.
 
-## Story 2 — Migrate Wallet identities
+## Task 2 — Migrate Wallet identities
 
-As the Wallet service, I want covered Wallet entities to use internal IDs and typed references so that external and
-cross-service flows no longer depend on storage identity.
+Jira story: [ZEX-4](https://szy2425973547.atlassian.net/browse/ZEX-4)
 
-Acceptance criteria:
+Migrate the covered Wallet owners and boundaries to generated internal IDs and typed references.
+
+Done when:
 
 - Wallet, transaction, reservation, and action rows use generated `internal_id` primary keys and unique typed refs.
 - Legacy owner `id` and generated business-ID columns are removed.
@@ -28,12 +30,13 @@ Acceptance criteria:
 - BalanceSnapshot keeps its current identity, while references to migrated Wallet entities use typed refs.
 - Creation and accepted idempotent replay preserve the original references atomically.
 
-## Story 3 — Migrate Ledger identities
+## Task 3 — Migrate Ledger identities
 
-As the Ledger service, I want covered Ledger entities to use internal IDs and typed references so that accounting
-records have stable identities without exposing database keys.
+Jira story: [ZEX-5](https://szy2425973547.atlassian.net/browse/ZEX-5)
 
-Acceptance criteria:
+Migrate the covered Ledger owners and boundaries to generated internal IDs and typed references.
+
+Done when:
 
 - Account, transaction, and entry rows use generated `internal_id` primary keys and unique typed refs.
 - Legacy owner `id` and generated business-ID columns are removed.
@@ -41,12 +44,13 @@ Acceptance criteria:
 - `wallet_txn_ref` is the Ledger command identity; successful replies expose `ledger_txn_ref`.
 - Reprocessing the same command creates no duplicate accounting effect and returns stored references.
 
-## Story 4 — Migrate event and outbox identity
+## Task 4 — Migrate event and outbox identity
 
-As the messaging layer, I want durable event references separated from outbox row IDs so that retries and
-deduplication retain one stable message identity.
+Jira story: [ZEX-6](https://szy2425973547.atlassian.net/browse/ZEX-6)
 
-Acceptance criteria:
+Separate durable event references from outbox-row internal IDs and migrate delivery boundaries.
+
+Done when:
 
 - Wallet and Ledger outbox rows use generated `internal_id` primary keys and unique `event_ref` values.
 - A Wallet request `event_ref` is committed with business state and reused for immediate publication and retries.
@@ -56,10 +60,12 @@ Acceptance criteria:
 
 ## Integration Task — Complete the safe cutover
 
+Jira task: [ZEX-7](https://szy2425973547.atlassian.net/browse/ZEX-7)
+
 Verify that the completed identity migration remains fail-closed and observable and contains no legacy or
 compatibility path.
 
-Acceptance criteria:
+Done when:
 
 - Allocation, encoding, duplicate, and ownership failures roll back the complete transaction with no fallback ID.
 - Duplicate internal IDs or references produce a high-severity operational signal.

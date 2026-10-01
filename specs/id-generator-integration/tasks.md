@@ -1,13 +1,15 @@
-# Agile Stories — Phase-One ID Generator Integration
+# Implementation Tasks — Phase-One ID Generator Integration
 
-Source: [spec.md](./spec.md)
+Source: [SPEC](./spec.md) | Jira epic: [ZEX-1](https://szy2425973547.atlassian.net/browse/ZEX-1)
 
-## Story 1 — Provide the managed generator runtime
+## Task 1 — Provide the managed generator runtime
 
-As a service developer, I want `z-id-generator` managed by Spring so that every process has one safe, shared ID
-source without owning infrastructure manually.
+Jira story: [ZEX-8](https://szy2425973547.atlassian.net/browse/ZEX-8)
 
-Acceptance criteria:
+Integrate `z-id-generator` as a Spring-managed, process-wide runtime shared by each service's threads and entity
+types.
+
+Done when:
 
 - Wallet and Ledger use separate configured domains and one generator instance per process.
 - Worker acquisition, renewal, ownership loss, and shutdown follow the generator lifecycle.
@@ -15,12 +17,13 @@ Acceptance criteria:
 - Generation after initialization performs no database call per ID.
 - The generator artifact and compatible Java 21 dependency versions are fixed.
 
-## Story 2 — Migrate Wallet ID generation
+## Task 2 — Migrate Wallet ID generation
 
-As the Wallet service, I want all scoped Wallet IDs allocated by the managed generator so that they remain unique
-across threads, instances, entity types, and safe restarts.
+Jira story: [ZEX-9](https://szy2425973547.atlassian.net/browse/ZEX-9)
 
-Acceptance criteria:
+Replace every scoped Wallet ID allocation path with the injected Wallet generator.
+
+Done when:
 
 - Wallet, transaction, reservation, and action creation use the injected Wallet generator.
 - Existing schemas, field types, protobufs, caches, and API shapes remain unchanged.
@@ -28,12 +31,13 @@ Acceptance criteria:
 - Accepted idempotent replay returns persisted IDs without allocating replacements.
 - Existing balance guards, reservation invariants, and transaction boundaries remain intact.
 
-## Story 3 — Migrate Ledger ID generation
+## Task 3 — Migrate Ledger ID generation
 
-As the Ledger service, I want account, transaction, and entry IDs allocated by its managed generator so that
-concurrent processing cannot produce duplicate accounting identities.
+Jira story: [ZEX-10](https://szy2425973547.atlassian.net/browse/ZEX-10)
 
-Acceptance criteria:
+Replace every scoped Ledger ID allocation path with the injected Ledger generator.
+
+Done when:
 
 - Account, transaction, and entry creation use the injected Ledger generator.
 - All IDs are within `1..Long.MAX_VALUE`; consumers neither decode nor order by their internals.
@@ -41,12 +45,13 @@ Acceptance criteria:
 - Allocation or duplicate failure rolls back the complete double-entry transaction.
 - Ledger contains no process-local wall-clock or `AtomicLong` generator path.
 
-## Story 4 — Stabilize request and reply event identity
+## Task 4 — Stabilize request and reply event identity
 
-As the messaging layer, I want request IDs to survive every delivery attempt and reply IDs to remain deterministic
-so that at-least-once delivery does not create duplicate effects.
+Jira story: [ZEX-11](https://szy2425973547.atlassian.net/browse/ZEX-11)
 
-Acceptance criteria:
+Migrate request-event allocation while preserving stable publication, retry, and reply identities.
+
+Done when:
 
 - A Wallet request event receives one generated `event_id` in the Wallet business transaction.
 - Immediate publication, outbox retry, redelivery, and correlation reuse the stored `event_id`.
@@ -56,10 +61,12 @@ Acceptance criteria:
 
 ## Integration Task — Verify fail-closed cutover
 
+Jira task: [ZEX-12](https://szy2425973547.atlassian.net/browse/ZEX-12)
+
 Verify that the completed generator integration rejects unsafe generation, exposes actionable failures, and
 contains no legacy or fallback generator path.
 
-Acceptance criteria:
+Done when:
 
 - Invalid configuration, database failure, worker exhaustion, acquisition failure, or unsafe ownership blocks ID writes.
 - No wall-clock, `AtomicLong`, selectable fallback, or regeneration-after-partial-write path remains.
