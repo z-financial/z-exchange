@@ -9,7 +9,6 @@ import com.exchange.app.wallet.po.transaction.WalletReservation;
 import com.exchange.app.wallet.po.transaction.WalletTransaction;
 import com.exchange.app.wallet.po.wallet.WalletAccountMapping;
 import com.exchange.app.wallet.exception.WalletExceptionFactory;
-import com.exchange.app.wallet.utils.IdGenerator;
 import com.exchange.app.wallet.utils.OutboxHelper;
 import com.exchange.common.outbox.po.Outbox;
 import com.exchange.common.result.Result;
@@ -24,9 +23,9 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 public class ObjectBuilder {
-    public static WalletTransaction createTransaction(TransactionType transactionType, String referenceId, ServiceId serviceId, String idempotencyKey, BusinessType businessType) {
+    public static WalletTransaction createTransaction(String transactionId, TransactionType transactionType, String referenceId, ServiceId serviceId, String idempotencyKey, BusinessType businessType) {
         return WalletTransaction.create(
-                IdGenerator.generateWalletTransactionId(),
+                transactionId,
                 referenceId,
                 serviceId,
                 idempotencyKey,
@@ -36,12 +35,12 @@ public class ObjectBuilder {
         );
     }
 
-    public static WalletReservation createReservation(WalletTransaction walletTransaction, String walletId, TransactionLinePb line) {
+    public static WalletReservation createReservation(String reservationId, WalletTransaction walletTransaction, String walletId, TransactionLinePb line) {
         switch (line.getOperationType()) {
             case OperationTypePb_Debit:
                 // in Atomic txn, reservation asset goes into pending settle after created
                 return  WalletReservation.create(
-                        IdGenerator.generateReservationId(),
+                        reservationId,
                         walletTransaction.getInitiator(),
                         walletTransaction.getReferenceId() + ":" + walletId,
                         walletId,
@@ -58,7 +57,7 @@ public class ObjectBuilder {
                 );
             case OperationTypePb_Reserve:
                 return  WalletReservation.create(
-                        IdGenerator.generateReservationId(),
+                        reservationId,
                         walletTransaction.getInitiator(),
                         walletTransaction.getReferenceId() + ":" + walletId,
                         walletId,
@@ -77,26 +76,32 @@ public class ObjectBuilder {
         }
     }
 
-    public static List<WalletAction> createActionsFromLine(String txnId, String walletId, String reservationId, TransactionLinePb line) {
+    public static List<WalletAction> createActionsFromLine(String txnId, String walletId, String reservationId, TransactionLinePb line, List<String> actionIds) {
+        int requiredCount = requiredActionCount(line);
+        if (actionIds.size() != requiredCount) {
+            throw WalletExceptionFactory.invalidValue(
+                    "expected " + requiredCount + " action IDs but got " + actionIds.size());
+        }
+        int actionIndex = 0;
         List<WalletAction> actions = new ArrayList<>();
         switch (line.getOperationType()) {
             case OperationTypePb_Reserve:
-                actions.add(createAction(txnId, walletId, null, WalletBucket.AVAILABLE, ActionType.RESERVE, line));
+                actions.add(createAction(actionIds.get(actionIndex), txnId, walletId, null, WalletBucket.AVAILABLE, ActionType.RESERVE, line));
                 break;
             case OperationTypePb_Earmark:
-                actions.add(createAction(txnId, walletId, reservationId, WalletBucket.RESERVED, ActionType.CONSUME, line));
-                actions.add(createAction(txnId, walletId, null, WalletBucket.RESERVED, ActionType.TRANSFER_OUT, line));
+                actions.add(createAction(actionIds.get(actionIndex++), txnId, walletId, reservationId, WalletBucket.RESERVED, ActionType.CONSUME, line));
+                actions.add(createAction(actionIds.get(actionIndex), txnId, walletId, null, WalletBucket.RESERVED, ActionType.TRANSFER_OUT, line));
                 break;
             case OperationTypePb_Release:
-                actions.add(createAction(txnId, walletId, reservationId, WalletBucket.RESERVED, ActionType.RELEASE, line));
+                actions.add(createAction(actionIds.get(actionIndex), txnId, walletId, reservationId, WalletBucket.RESERVED, ActionType.RELEASE, line));
                 break;
             case OperationTypePb_Debit:
-                actions.add(createAction(txnId, walletId, null, WalletBucket.AVAILABLE, ActionType.RESERVE, line));
-                actions.add(createAction(txnId, walletId, reservationId, WalletBucket.RESERVED, ActionType.CONSUME, line));
-                actions.add(createAction(txnId, walletId, null, WalletBucket.RESERVED, ActionType.TRANSFER_OUT, line));
+                actions.add(createAction(actionIds.get(actionIndex++), txnId, walletId, null, WalletBucket.AVAILABLE, ActionType.RESERVE, line));
+                actions.add(createAction(actionIds.get(actionIndex++), txnId, walletId, reservationId, WalletBucket.RESERVED, ActionType.CONSUME, line));
+                actions.add(createAction(actionIds.get(actionIndex), txnId, walletId, null, WalletBucket.RESERVED, ActionType.TRANSFER_OUT, line));
                 break;
             case OperationTypePb_Credit:
-                actions.add(createAction(txnId, walletId, null, WalletBucket.AVAILABLE, ActionType.TRANSFER_IN, line));
+                actions.add(createAction(actionIds.get(actionIndex), txnId, walletId, null, WalletBucket.AVAILABLE, ActionType.TRANSFER_IN, line));
                 break;
             default:
                 throw WalletExceptionFactory.invalidEnum("invalid operation type: " + line.getOperationType());
@@ -104,9 +109,18 @@ public class ObjectBuilder {
         return actions;
     }
 
-    public static WalletAction createAction(String txnId, String walletId, String reservationId, WalletBucket bucket, ActionType actionType, TransactionLinePb line) {
+    public static int requiredActionCount(TransactionLinePb line) {
+        return switch (line.getOperationType()) {
+            case OperationTypePb_Reserve, OperationTypePb_Release, OperationTypePb_Credit -> 1;
+            case OperationTypePb_Earmark -> 2;
+            case OperationTypePb_Debit -> 3;
+            default -> throw WalletExceptionFactory.invalidEnum("invalid operation type: " + line.getOperationType());
+        };
+    }
+
+    public static WalletAction createAction(String actionId, String txnId, String walletId, String reservationId, WalletBucket bucket, ActionType actionType, TransactionLinePb line) {
         return WalletAction.create(
-                IdGenerator.generateWalletActionId(),
+                actionId,
                 txnId,
                 walletId,
                 line.getAssetCode(),

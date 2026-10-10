@@ -17,6 +17,7 @@ import com.exchange.common.redis.idemp.utils.CommonIdempHelper;
 import com.exchange.common.redis.idemp.utils.IdempValue;
 import com.exchange.common.constant.GlobalServiceId;
 import com.exchange.common.db.utils.DbTxnExecutor;
+import com.exchange.common.idgen.InternalIdGenerator;
 import com.exchange.common.result.error.IdempErrorCode;
 import com.exchange.common.result.error.RedisErrorCode;
 import com.exchange.common.result.IResult;
@@ -27,7 +28,6 @@ import com.exchange.common.utils.TokenHelper;
 import com.exchange.proto.ledger.post.LedgerEntryPb;
 import com.exchange.proto.ledger.post.PostTransactionRequestPb;
 import com.exchange.app.ledger.utils.EnumMappers;
-import com.exchange.app.ledger.utils.IdGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,14 +54,27 @@ public class PostLedgerProcessor {
 
     final private DbTxnExecutor dbTxnExecutor;
     private final LedgerTxnStore ledgerTxnStore;
+    private final InternalIdGenerator internalIdGenerator;
 
     public PostTransactionResult postTransaction(PostTransactionRequestPb req) {
         String token = TokenHelper.generateToken(GlobalServiceId.LEDGER.name());
+        try {
+            PostTransactionResult result = doPostTransaction(req, token);
+            if (!result.isSuccess()) {
+                releaseOwnedIdempotencySafely(req, token);
+            }
+            return result;
+        } catch (RuntimeException failure) {
+            // In particular, generator failures must not strand an owned PENDING claim.
+            releaseOwnedIdempotencySafely(req, token);
+            throw failure;
+        }
+    }
 
+    private PostTransactionResult doPostTransaction(PostTransactionRequestPb req, String token) {
         Result<IdempDecision> idempResult = idempClaimAndReqValidate(req, token);
         if (idempResult.isFailed()) {
-            // TODO no need to release claimed key here, since there should not be a key in cache with given token
-            return onError(req, token, idempResult);
+            return toFailure(idempResult);
         }
 
         IdempDecision idempDecision = idempResult.getValue();
@@ -74,20 +87,23 @@ public class PostLedgerProcessor {
             );
         }
 
-        String txnId = IdGenerator.generateLedgerTxnId();
-        LedgerTxn ledgerTxn = LedgerTxn.create(txnId, req.getReferenceId());
         List<String> accountRefs = req.getEntriesList().stream().map(LedgerEntryPb::getAccountRef).distinct().collect(Collectors.toList());
         Map<String, String> accountRefToAccountId = accountManager.getAccountIdInRef(accountRefs).stream()
                 .collect(Collectors.toMap(Account::getReferenceId, Account::getAccountId));
         if (accountRefToAccountId.size() != accountRefs.size()) {
             Set<String> notFound = new HashSet<>(accountRefs) {{removeAll(accountRefToAccountId.keySet());}};
             log.error("account not found, notFoundRefs={}", notFound);
-            return onError(req, token, LedgerServiceErrorCode.ACCOUNT_NOT_FOUND, "account_not_found, refs: " + notFound);
+            return PostTransactionResult.failure(
+                    LedgerServiceErrorCode.ACCOUNT_NOT_FOUND, "account_not_found, refs: " + notFound);
         }
 
+        // Allocate the complete Ledger object graph before entering the business DB transaction.
+        String txnId = nextInternalId();
+        LedgerTxn ledgerTxn = LedgerTxn.create(txnId, req.getReferenceId());
         List<LedgerEntry> entries = new ArrayList<>();
         for (LedgerEntryPb entryPb : req.getEntriesList()) {
-            entries.add(createLedgerEntry(txnId, entryPb, accountRefToAccountId.get(entryPb.getAccountRef())));
+            entries.add(createLedgerEntry(
+                    nextInternalId(), txnId, entryPb, accountRefToAccountId.get(entryPb.getAccountRef())));
         }
         Result<Void> result = dbTxnExecutor.executeWithDefault(() -> {
             if (ledgerTxnRepository.insertIgnore(ledgerTxn) == 0) {
@@ -106,7 +122,7 @@ public class PostLedgerProcessor {
             return Result.success();
         });
         if (result.isFailed()) {
-            return onError(req, token, result);
+            return toFailure(result);
         }
         // clean negative cache (if exist) after inserting ledger txn
         ledgerTxnStore.postInsert(ledgerTxn);
@@ -247,9 +263,9 @@ public class PostLedgerProcessor {
         return Result.success();
     }
 
-    private LedgerEntry createLedgerEntry(String txnId, LedgerEntryPb entryPb, String accountId) {
+    private LedgerEntry createLedgerEntry(String entryId, String txnId, LedgerEntryPb entryPb, String accountId) {
         return LedgerEntry.create(
-                IdGenerator.generateLedgerEntryId(),
+                entryId,
                 txnId,
                 entryPb.getAssetId(),
                 accountId,
@@ -258,24 +274,29 @@ public class PostLedgerProcessor {
         );
     }
 
-    // release the owned idemp key if txn not persisted in db when an error occurs. this can help idemp check recover from error
-    private PostTransactionResult onError(PostTransactionRequestPb req, String token, LedgerServiceErrorCode errorCode, String detail) {
-        releaseIdempIfOwned(req.getReferenceId(), getReqStableHash(req), token);
-
-        return PostTransactionResult.failure(errorCode, detail);
+    private String nextInternalId() {
+        return Long.toString(internalIdGenerator.nextId());
     }
 
-    private PostTransactionResult onError(PostTransactionRequestPb req, String token, IResult<?> result) {
+    private PostTransactionResult toFailure(IResult<?> result) {
         Objects.requireNonNull(result, "result");
-        return onError(req, token, LedgerBoundaryErrorMapper.toLedgerErrorCode(result), result.getDetail());
+        return PostTransactionResult.failure(
+                LedgerBoundaryErrorMapper.toLedgerErrorCode(result), result.getDetail());
     }
 
-    private void releaseIdempIfOwned(String refId, String hash, String token) {
-        String idempV = CommonIdempHelper.idempPendingValue(hash, token);
-        Result<String> releaseResult = idempotencyClient.releaseIdempIfOwned(GlobalServiceId.LEDGER.code, SCOPE, refId, idempV);
-        if (releaseResult.isFailed()) {
-            // log the error
-            log.error("release ledger idempotency failed, result={}", releaseResult);
+    private void releaseOwnedIdempotencySafely(PostTransactionRequestPb req, String token) {
+        try {
+            String idempV = CommonIdempHelper.idempPendingValue(getReqStableHash(req), token);
+            Result<String> releaseResult = idempotencyClient.releaseIdempIfOwned(
+                    GlobalServiceId.LEDGER.code, SCOPE, req.getReferenceId(), idempV);
+            if (releaseResult.isFailed()) {
+                log.error("release ledger idempotency failed, referenceId={}, result={}",
+                        req.getReferenceId(), releaseResult);
+            }
+        } catch (RuntimeException cleanupFailure) {
+            // Compare-and-delete cleanup is best effort and must not mask the original failure.
+            log.error("release ledger idempotency threw, referenceId={}",
+                    req.getReferenceId(), cleanupFailure);
         }
     }
 

@@ -72,7 +72,8 @@ create table wallets (
     owner_type tinyint not null,
     owner_id varchar(64) not null,
     unique key(wallet_id),
-    unique key(service_id, reference_id, wallet_id),
+    /* One service-owned business reference identifies exactly one wallet. */
+    unique key uk_wallet_service_reference(service_id, reference_id),
     key(owner_type, owner_id)
 );
 

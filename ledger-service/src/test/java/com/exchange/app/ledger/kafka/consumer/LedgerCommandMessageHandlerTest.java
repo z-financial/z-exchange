@@ -8,7 +8,10 @@ import com.exchange.app.ledger.result.LedgerServiceErrorCode;
 import com.exchange.app.ledger.result.PostTransactionResult;
 import com.exchange.common.exception.AbnormalProtoDataException;
 import com.exchange.common.exception.CustomizedException;
+import com.exchange.common.exception.IdGeneratorException;
+import com.exchange.common.idgen.IdGeneratorContext;
 import com.exchange.common.kafka.listener.exception.KafkaListenerRetriableException;
+import com.exchange.common.result.error.IdGeneratorErrorCode;
 import com.exchange.proto.common.error.ErrorCodePb;
 import com.exchange.proto.common.event.EventEnvelopePb;
 import com.exchange.proto.ledger.common.LedgerDirectionPb;
@@ -137,6 +140,23 @@ class LedgerCommandMessageHandlerTest {
         );
 
         assertEquals(LedgerServiceErrorCode.REQUEST_IN_PROCESSING, thrown.getErrorCode());
+    }
+
+    @Test
+    void idGeneratorFailureIsRetryable() {
+        IdGeneratorException generatorFailure = IdGeneratorException.allocation(
+                new IdGeneratorContext("ledger-service", "z-exchange-ledger", "internal-id", "ledger-1"),
+                new RuntimeException("generator unavailable"));
+        when(postLedgerProcessor.postTransaction(any(PostTransactionRequestPb.class)))
+                .thenThrow(generatorFailure);
+
+        KafkaListenerRetriableException thrown = assertThrows(
+                KafkaListenerRetriableException.class,
+                () -> handler.apply(envelope(EventType.POST_LEDGER, request().toByteString()))
+        );
+
+        assertEquals(IdGeneratorErrorCode.ALLOCATION_FAILED, thrown.getErrorCode());
+        assertEquals(generatorFailure, thrown.getCause());
     }
 
     private EventEnvelopePb envelope(String eventType, ByteString payload) {

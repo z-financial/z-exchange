@@ -16,6 +16,7 @@ public enum LedgerServiceErrorCode implements ErrorCode {
     LEDGER_DUPLICATED(1000, ErrorCategory.ALREADY_EXISTS, "ledger_duplicated"),
     LEDGER_NOT_FOUND(1001, ErrorCategory.NOT_FOUND, "ledger_not_found"),
     ACCOUNT_NOT_FOUND(1100, ErrorCategory.NOT_FOUND, "account_not_found"),
+    ACCOUNT_INFO_MISMATCH(1101, ErrorCategory.FAILED_PRECONDITION, "account_info_mismatch"),
     ASSET_NOT_FOUND(1200, ErrorCategory.NOT_FOUND, "asset_not_found"),
     LEDGER_OUTBOX_DUPLICATED(2000, ErrorCategory.ALREADY_EXISTS, "ledger_outbox_duplicated");
 

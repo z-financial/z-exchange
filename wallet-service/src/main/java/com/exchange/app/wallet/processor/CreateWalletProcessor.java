@@ -16,6 +16,7 @@ import com.exchange.app.wallet.result.WalletBoundaryErrorMapper;
 import com.exchange.app.wallet.result.WalletServiceErrorCode;
 import com.exchange.app.wallet.utils.*;
 import com.exchange.common.db.utils.DbTxnExecutor;
+import com.exchange.common.idgen.InternalIdGenerator;
 import com.exchange.common.result.Result;
 import com.exchange.proto.ledger.account.CreateAccountReplyPb;
 import com.exchange.proto.ledger.account.CreateAccountRequestPb;
@@ -29,6 +30,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.Objects;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
@@ -41,6 +44,7 @@ public class CreateWalletProcessor {
     final private BalanceSnapshotStore balanceSnapshotStore;
 
     final private AccountServiceClient accountServiceClient;
+    final private InternalIdGenerator internalIdGenerator;
 
     public CreateWalletReplyPb createWallet(CreateWalletRequestPb req) {
         ServiceId serviceId = EnumPbMappers.serviceIdPbMapper.to(req.getServiceId());
@@ -51,10 +55,16 @@ public class CreateWalletProcessor {
         }
 
         Wallet walletInDb = walletManager.selectByReferenceId(serviceId, req.getReferenceId());
-        if (walletInDb != null && walletInDb.getWalletStatus().hasInitiated()) {
-            balanceSnapshotStore.postInsert(walletInDb.getWalletId(), walletInDb.getServiceId(), walletInDb.getReferenceId(), walletInDb.getOwnerType());
-            return replySuccess("wallet has been created");
-        } else if (walletInDb == null) {
+        if (walletInDb != null) {
+            if (!matchesRequest(walletInDb, req, serviceId, ownerType)) {
+                return replyError(WalletServiceErrorCode.WALLET_INFO_MISMATCH,
+                        "wallet reference already exists with different attributes");
+            }
+            if (walletInDb.getWalletStatus().hasInitiated()) {
+                balanceSnapshotStore.postInsert(walletInDb.getWalletId(), walletInDb.getServiceId(), walletInDb.getReferenceId(), walletInDb.getOwnerType());
+                return replySuccess("wallet has been created");
+            }
+        } else {
             Result<Wallet> walletResult = createWalletInDb(req, serviceId, ownerType);
             if (!walletResult.isSuccess()) {
                 return replyError(walletResult);
@@ -87,13 +97,34 @@ public class CreateWalletProcessor {
     }
 
     private Result<Wallet> createWalletInDb(CreateWalletRequestPb req, ServiceId serviceId, OwnerType ownerType) {
-        String walletId = IdGenerator.generateWalletId();
+        // Allocate before database work; the managed generator must never extend a business transaction.
+        String walletId = Long.toString(internalIdGenerator.nextId());
         Wallet wallet = Wallet.create(walletId, serviceId, req.getReferenceId(), req.getAssetId(), WalletStatus.INIT, ownerType, req.getOwnerId());
-        // return duplicated wallet error here, maybe some other thread is creating the same wallet
         if (walletManager.insertIgnore(wallet) == 0) {
+            // A concurrent creator may have won the business-key race. Its persisted ID is authoritative.
+            Wallet winner = walletManager.selectByReferenceId(serviceId, req.getReferenceId());
+            if (winner != null && matchesRequest(winner, req, serviceId, ownerType)) {
+                return Result.success(winner);
+            }
+            if (winner != null) {
+                return Result.failure(WalletServiceErrorCode.WALLET_INFO_MISMATCH,
+                        "wallet reference already exists with different attributes");
+            }
             return Result.failure(WalletServiceErrorCode.WALLET_DUPLICATED, wallet.toString());
         }
         return Result.success(wallet);
+    }
+
+    private boolean matchesRequest(
+            Wallet wallet,
+            CreateWalletRequestPb req,
+            ServiceId serviceId,
+            OwnerType ownerType) {
+        return wallet.getServiceId() == serviceId
+                && Objects.equals(wallet.getReferenceId(), req.getReferenceId())
+                && Objects.equals(wallet.getAssetId(), req.getAssetId())
+                && wallet.getOwnerType() == ownerType
+                && Objects.equals(wallet.getOwnerId(), req.getOwnerId());
     }
 
     private Result<Void> createAccount(Wallet wallet) {
@@ -145,5 +176,11 @@ public class CreateWalletProcessor {
         WalletServiceErrorCode errorCode = WalletBoundaryErrorMapper.toWalletErrorCode(result);
         CreateWalletReplyPb.Builder builder = CreateWalletReplyPb.newBuilder();
         return builder.setError(PbErrorBuilder.build(errorCode, result.getDetail())).build();
+    }
+
+    private CreateWalletReplyPb replyError(WalletServiceErrorCode errorCode, String detail) {
+        return CreateWalletReplyPb.newBuilder()
+                .setError(PbErrorBuilder.build(errorCode, detail))
+                .build();
     }
 }

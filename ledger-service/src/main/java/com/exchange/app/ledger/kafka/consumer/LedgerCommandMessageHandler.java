@@ -9,6 +9,7 @@ import com.exchange.app.ledger.result.PostTransactionResult;
 import com.exchange.app.ledger.utils.OutboxHelper;
 import com.exchange.common.exception.AbnormalProtoDataException;
 import com.exchange.common.exception.CustomizedException;
+import com.exchange.common.exception.IdGeneratorException;
 import com.exchange.common.kafka.listener.exception.KafkaListenerRetriableException;
 import com.exchange.common.outbox.po.Outbox;
 import com.exchange.proto.common.event.EventEnvelopePb;
@@ -46,10 +47,17 @@ public class LedgerCommandMessageHandler implements Function<EventEnvelopePb, Ou
 
     private Outbox handlePostLedger(EventEnvelopePb envelope) {
         PostTransactionRequestPb request = parsePostLedgerRequest(envelope);
-        PostTransactionResult result = ledgerBusinessMetrics.recordPostTransaction(
-                LedgerMetricTagValues.Ingress.KAFKA,
-                () -> postLedgerProcessor.postTransaction(request)
-        );
+        PostTransactionResult result;
+        try {
+            result = ledgerBusinessMetrics.recordPostTransaction(
+                    LedgerMetricTagValues.Ingress.KAFKA,
+                    () -> postLedgerProcessor.postTransaction(request)
+            );
+        } catch (IdGeneratorException failure) {
+            // Generator availability is infrastructure state: retain the Kafka record for retry.
+            throw new KafkaListenerRetriableException(
+                    failure.getErrorCode(), "ledger ID allocation is unavailable", failure);
+        }
         if (!result.isSuccess()) {
             handlePostLedgerFailure(result);
         }

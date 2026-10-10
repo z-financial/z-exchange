@@ -21,6 +21,7 @@ import com.exchange.app.wallet.result.WalletServiceErrorCode;
 import com.exchange.app.wallet.utils.*;
 import com.exchange.common.constant.GlobalServiceId;
 import com.exchange.common.db.utils.DbTxnExecutor;
+import com.exchange.common.idgen.InternalIdGenerator;
 import com.exchange.common.kafka.producer.IPublisher;
 import com.exchange.common.outbox.dao.repository.OutboxRepository;
 import com.exchange.common.outbox.po.Outbox;
@@ -60,13 +61,27 @@ public class BeforePostLedgerProcessor {
     private final IPublisher postLedgerPublisher;
     private final UpdateReservationProcessor updateReservationProcessor;
     private final UpdateBalanceSnapshotProcessor updateBalanceSnapshotProcessor;
+    private final InternalIdGenerator internalIdGenerator;
 
     // reserve -> snapshot: -available, +reserved
     // consume -> reservation: -remaining, +pending_settle
     // release -> snapshot, reservation: -reserved, +available | -pending_settle, +released, change status
     // package private
-    // need to release the claimed idemp key if token matches
     public Result<TransactionInfo> beforePostingLedger(RequestInfo requestInfo, boolean needPostLedger) {
+        try {
+            Result<TransactionInfo> result = doBeforePostingLedger(requestInfo, needPostLedger);
+            if (result.isFailed()) {
+                releaseOwnedIdempotencySafely(requestInfo);
+            }
+            return result;
+        } catch (RuntimeException failure) {
+            // Generator and validation exceptions must not strand an owned PENDING claim.
+            releaseOwnedIdempotencySafely(requestInfo);
+            throw failure;
+        }
+    }
+
+    private Result<TransactionInfo> doBeforePostingLedger(RequestInfo requestInfo, boolean needPostLedger) {
         WalletTransaction walletTxn = createTxn(requestInfo);
 
         // complete txn immediately if no need to post ledger
@@ -90,7 +105,6 @@ public class BeforePostLedgerProcessor {
             reservationsInRequest = walletReservationManager.selectByRefs(walletTxn.getInitiator(), new ArrayList<>(reservationRefs));
             if (reservationsInRequest.size() != reservationRefs.size()) {
                 log.error("reservations not found, requested_reservation: {}, reservation_in_db: {}", reservationRefs, reservationsInRequest);
-                releaseIdempBeforeReturnError(requestInfo.idempotenceKey, requestInfo.getStableHash(), requestInfo.token);
                 return Result.failure(WalletServiceErrorCode.WALLET_RESERVATION_NOT_FOUND, "reservations not found");
             }
         }
@@ -103,7 +117,6 @@ public class BeforePostLedgerProcessor {
             BalanceSnapshot snapshot = walletRefToSnapshot.get(line.getWalletRef());
             if (snapshot == null) {
                 log.error("snapshot not found, line: {}", line);
-                releaseIdempBeforeReturnError(requestInfo.idempotenceKey, requestInfo.getStableHash(), requestInfo.token);
                 return Result.failure(WalletServiceErrorCode.BALANCE_SNAPSHOT_NOT_FOUND, "snapshot not found");
             }
 
@@ -111,7 +124,7 @@ public class BeforePostLedgerProcessor {
             switch (line.getOperationType()) {
                 case OperationTypePb_Reserve:
                 case OperationTypePb_Debit:
-                    reservation = ObjectBuilder.createReservation(walletTxn, snapshot.getWalletId(), line);
+                    reservation = ObjectBuilder.createReservation(nextInternalId(), walletTxn, snapshot.getWalletId(), line);
                     createdReservations.add(reservation);
                     refToReservation.put(reservation.getReferenceId(), reservation);
                     break;
@@ -120,7 +133,6 @@ public class BeforePostLedgerProcessor {
                     reservation = refToReservation.get(line.getReservationRef());
                     if (reservation == null) {
                         log.error("reservation not found, ref: {}", line);
-                        releaseIdempBeforeReturnError(requestInfo.idempotenceKey, requestInfo.getStableHash(), requestInfo.token);
                         return Result.failure(WalletServiceErrorCode.WALLET_RESERVATION_NOT_FOUND, "reservation not found");
                     }
             }
@@ -129,7 +141,13 @@ public class BeforePostLedgerProcessor {
             if (reservation != null) {
                 reservationId = reservation.getReferenceId();
             }
-            List<WalletAction> actionsFromLine = ObjectBuilder.createActionsFromLine(walletTxn.getTxnId(), snapshot.getWalletId(), reservationId, line);
+            int actionCount = ObjectBuilder.requiredActionCount(line);
+            List<String> actionIds = new ArrayList<>(actionCount);
+            for (int i = 0; i < actionCount; i++) {
+                actionIds.add(nextInternalId());
+            }
+            List<WalletAction> actionsFromLine = ObjectBuilder.createActionsFromLine(
+                    walletTxn.getTxnId(), snapshot.getWalletId(), reservationId, line, actionIds);
             actions.addAll(actionsFromLine);
         }
 
@@ -137,13 +155,11 @@ public class BeforePostLedgerProcessor {
         Result<Void> result = TransactionValidateHelper.validateActionInfo(actions, balanceSnapshots, new ArrayList<>(refToReservation.values()));
         if (result.isFailed()) {
             log.error("validate action info failed, result: {}", result);
-            releaseIdempBeforeReturnError(requestInfo.idempotenceKey, requestInfo.getStableHash(), requestInfo.token);
             return Result.failure(result);
         }
 
-        Result<Outbox> outboxResult = createOutboxIfNeeded(walletTxn, actions, requestInfo, needPostLedger);
+        Result<Outbox> outboxResult = createOutboxIfNeeded(walletTxn, actions, needPostLedger);
         if (!outboxResult.isSuccess()) {
-            releaseIdempBeforeReturnError(requestInfo.idempotenceKey, requestInfo.getStableHash(), requestInfo.token);
             return Result.failure(outboxResult);
         }
         Outbox outbox = outboxResult.getValue();
@@ -152,7 +168,6 @@ public class BeforePostLedgerProcessor {
         Result<List<BalanceSnapshot>> updateResult = updateDbToCreateTxn(walletTxn, actions, balanceSnapshots, reservationsInRequest, createdReservations, outbox);
         if (updateResult.isFailed()) {
             log.error("updateDbToCreateTxn failed: {}", updateResult);
-            releaseIdempBeforeReturnError(requestInfo.idempotenceKey, requestInfo.getStableHash(), requestInfo.token);
             return Result.failure(updateResult);
         }
         // Cache refresh is best effort and must run only after the DB transaction commits.
@@ -174,13 +189,18 @@ public class BeforePostLedgerProcessor {
         return Result.success(TransactionInfo.create(walletTxn, actions, new ArrayList<>(refToReservation.values()), balanceSnapshots));
     }
 
-    private void releaseIdempBeforeReturnError(String IdempKey, String hash, String token) {
-        String idempV = CommonIdempHelper.idempPendingValue(hash, token);
-        Result<String> releaseResult = idempotencyClient.releaseIdempIfOwned(
-                GlobalServiceId.WALLET.code, Constant.SCOPE, IdempKey, idempV);
-        if (releaseResult.isFailed()) {
-            // log the error
-            log.error("release idemp failed, key:{} , result:{}", IdempKey, releaseResult);
+    private void releaseOwnedIdempotencySafely(RequestInfo requestInfo) {
+        try {
+            String idempV = CommonIdempHelper.idempPendingValue(requestInfo.getStableHash(), requestInfo.token);
+            Result<String> releaseResult = idempotencyClient.releaseIdempIfOwned(
+                    GlobalServiceId.WALLET.code, Constant.SCOPE, requestInfo.idempotenceKey, idempV);
+            if (releaseResult.isFailed()) {
+                log.error("release wallet idempotency failed, key={}, result={}",
+                        requestInfo.idempotenceKey, releaseResult);
+            }
+        } catch (RuntimeException cleanupFailure) {
+            // Cleanup is best effort and must never replace the original business failure.
+            log.error("release wallet idempotency threw, key={}", requestInfo.idempotenceKey, cleanupFailure);
         }
     }
 
@@ -188,7 +208,13 @@ public class BeforePostLedgerProcessor {
         ServiceId serviceId = EnumPbMappers.serviceIdPbMapper.to(requestInfo.serviceIdPb);
         BusinessType businessType = EnumPbMappers.businessTypePbMapper.to(requestInfo.businessTypePb);
 
-        return ObjectBuilder.createTransaction(requestInfo.transactionType, requestInfo.referenceId, serviceId, requestInfo.idempotenceKey, businessType);
+        // The generator call is deliberately outside updateDbToCreateTxn's transaction callback.
+        return ObjectBuilder.createTransaction(nextInternalId(), requestInfo.transactionType,
+                requestInfo.referenceId, serviceId, requestInfo.idempotenceKey, businessType);
+    }
+
+    private String nextInternalId() {
+        return Long.toString(internalIdGenerator.nextId());
     }
 
     private Result<List<BalanceSnapshot>> updateDbToCreateTxn(WalletTransaction walletTxn, List<WalletAction> actions, List<BalanceSnapshot> balanceSnapshots,
@@ -318,7 +344,7 @@ public class BeforePostLedgerProcessor {
         }
     }
 
-    private Result<Outbox> createOutboxIfNeeded(WalletTransaction walletTxn, List<WalletAction> actions, RequestInfo requestInfo, boolean needPostLedger) {
+    private Result<Outbox> createOutboxIfNeeded(WalletTransaction walletTxn, List<WalletAction> actions, boolean needPostLedger) {
         Outbox outbox = null;
         if (needPostLedger) {
             List<WalletAction> transferActions = actions.stream()
@@ -336,7 +362,6 @@ public class BeforePostLedgerProcessor {
             Result<Outbox> outboxResult = ObjectBuilder.createOutbox(walletTxn, actions, mappings);
             if (outboxResult.isFailed()) {
                 log.error("createOutbox failed: {}", outboxResult);
-                releaseIdempBeforeReturnError(requestInfo.idempotenceKey, requestInfo.getStableHash(), requestInfo.token);
                 return Result.failure(outboxResult);
             }
             outbox = outboxResult.getValue();

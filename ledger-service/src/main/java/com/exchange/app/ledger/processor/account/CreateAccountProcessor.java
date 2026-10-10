@@ -12,9 +12,9 @@ import com.exchange.common.result.Result;
 import com.exchange.proto.ledger.account.CreateAccountReplyPb;
 import com.exchange.proto.ledger.account.CreateAccountRequestPb;
 import com.exchange.app.ledger.utils.EnumMappers;
-import com.exchange.app.ledger.utils.IdGenerator;
 import com.exchange.app.ledger.utils.ValidateHelper;
 import com.exchange.app.ledger.po.enums.*;
+import com.exchange.common.idgen.InternalIdGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +28,7 @@ import java.util.Objects;
 public class CreateAccountProcessor {
     final private AccountRepository accountManager;
     final private AssetRepository assetRepository;
+    final private InternalIdGenerator internalIdGenerator;
 
     public CreateAccountReplyPb createAccount(CreateAccountRequestPb req) {
 
@@ -41,17 +42,52 @@ public class CreateAccountProcessor {
             return replyError(result);
         }
 
+        Account accountInDb = accountManager.getByServiceAndReference(serviceId, req.getReferenceId());
+        if (accountInDb != null) {
+            return matchesRequest(accountInDb, req, serviceId, category, normalSide, ownerType)
+                    ? replySuccess("account already exists")
+                    : replyError(LedgerServiceErrorCode.ACCOUNT_INFO_MISMATCH,
+                            "account reference already exists with different attributes");
+        }
+
         Asset asset = assetRepository.getByAssetId(req.getAssetId());
         if (asset == null) {
             return replyError(LedgerServiceErrorCode.ASSET_NOT_FOUND, req.getAssetId());
         }
 
-        String accountId = IdGenerator.generateAccountId();
-        if (accountManager.insertIgnore(Account.create(accountId, serviceId, req.getReferenceId(), category, normalSide, req.getOwnerId(), ownerType, req.getAssetId(), AccountStatus.OPEN))
-                == 0) {
-            return replySuccess("account already exists");
+        // Allocate only after replay and request validation, and outside any business DB transaction.
+        String accountId = Long.toString(internalIdGenerator.nextId());
+        Account account = Account.create(accountId, serviceId, req.getReferenceId(), category, normalSide,
+                req.getOwnerId(), ownerType, req.getAssetId(), AccountStatus.OPEN);
+        if (accountManager.insertIgnore(account) == 0) {
+            // A concurrent request may have inserted the same business reference first.
+            Account winner = accountManager.getByServiceAndReference(serviceId, req.getReferenceId());
+            if (winner != null && matchesRequest(winner, req, serviceId, category, normalSide, ownerType)) {
+                return replySuccess("account already exists");
+            }
+            if (winner != null) {
+                return replyError(LedgerServiceErrorCode.ACCOUNT_INFO_MISMATCH,
+                        "account reference already exists with different attributes");
+            }
+            return replyError(LedgerServiceErrorCode.SERVER_ERROR, "account ID already exists");
         }
         return replySuccess("success");
+    }
+
+    private boolean matchesRequest(
+            Account account,
+            CreateAccountRequestPb req,
+            ServiceId serviceId,
+            AccountCategory category,
+            NormalSide normalSide,
+            OwnerType ownerType) {
+        return account.getServiceId() == serviceId
+                && Objects.equals(account.getReferenceId(), req.getReferenceId())
+                && account.getCategory() == category
+                && account.getNormalSide() == normalSide
+                && Objects.equals(account.getOwnerId(), req.getOwnerId())
+                && account.getOwnerType() == ownerType
+                && Objects.equals(account.getAssetId(), req.getAssetId());
     }
 
     private Result<Void> validateReq(CreateAccountRequestPb req, ServiceId serviceId, AccountCategory category, NormalSide normalSide, OwnerType ownerType) {
