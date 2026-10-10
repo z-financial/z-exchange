@@ -22,7 +22,9 @@ public final class PostTransactionResultConverter {
         }
 
         if (result.isSuccess()) {
-            builder.setError(PbErrorBuilder.success(result.detail()));
+            // Creation and idempotent replay are the same wire outcome. Keep the payload
+            // canonical so a redelivery matches the already-persisted deterministic reply.
+            builder.setError(PbErrorBuilder.success());
         } else {
             builder.setError(PbErrorBuilder.build(result.errorCode(), result.detail()));
         }

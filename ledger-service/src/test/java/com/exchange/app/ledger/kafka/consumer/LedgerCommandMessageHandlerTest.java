@@ -26,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -73,21 +74,26 @@ class LedgerCommandMessageHandlerTest {
     }
 
     @Test
-    void idempotentReplayUsesSameSuccessReplyEventIdWithoutLedgerTxnId() {
-        // KL-LH-002: success reply event id is canonical for the request, not per ledger txn id.
+    void idempotentReplayReconstructsCanonicalSuccessReply() {
+        // KL-LH-002: creation and replay must resolve to the same durable reply intent.
         PostTransactionRequestPb request = request();
         when(postLedgerProcessor.postTransaction(any(PostTransactionRequestPb.class)))
-                .thenReturn(PostTransactionResult.idempotentReplay(
-                        "ref-1",
-                        "ledger-txn-replayed",
-                        "already exists",
-                        PostTransactionResult.IdempotentSource.DB
-                ));
+                .thenReturn(
+                        PostTransactionResult.created("ref-1", "ledger-txn-1", "created", 2),
+                        PostTransactionResult.idempotentReplay(
+                                "ref-1",
+                                "ledger-txn-1",
+                                "already exists",
+                                PostTransactionResult.IdempotentSource.DB
+                        )
+                );
 
-        var outbox = handler.apply(envelope(EventType.POST_LEDGER, request.toByteString()));
+        var createdOutbox = handler.apply(envelope(EventType.POST_LEDGER, request.toByteString()));
+        var replayOutbox = handler.apply(envelope(EventType.POST_LEDGER, request.toByteString()));
 
-        assertEquals("reply:" + REQUEST_EVENT_ID + ":success", outbox.getEventId());
-        assertFalse(outbox.getEventId().contains("ledger-txn-replayed"));
+        assertEquals(createdOutbox.getEventId(), replayOutbox.getEventId());
+        assertArrayEquals(createdOutbox.getPayload(), replayOutbox.getPayload());
+        assertFalse(replayOutbox.getEventId().contains("ledger-txn-1"));
     }
 
     @Test

@@ -359,7 +359,10 @@ public class BeforePostLedgerProcessor {
                 log.error("wallet_account_mapping_not_found, wallet_ids: {}, mappings: {}", walletIds, mappings);
                 return Result.failure(WalletServiceErrorCode.WALLET_ACCOUNT_MAPPING_NOT_FOUND, "wallet_account_mapping_not_found");
             }
-            Result<Outbox> outboxResult = ObjectBuilder.createOutbox(walletTxn, actions, mappings);
+            // Allocate once before the business transaction. The same persisted event ID is then
+            // reused by immediate publication and every outbox retry.
+            String eventId = nextInternalId();
+            Result<Outbox> outboxResult = ObjectBuilder.createOutbox(eventId, walletTxn, actions, mappings);
             if (outboxResult.isFailed()) {
                 log.error("createOutbox failed: {}", outboxResult);
                 return Result.failure(outboxResult);

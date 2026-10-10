@@ -131,7 +131,7 @@ public class ObjectBuilder {
         );
     }
 
-    public static Result<Outbox> createOutbox(WalletTransaction txn, List<WalletAction> actions, List<WalletAccountMapping> mappings) {
+    public static Result<Outbox> createOutbox(String eventId, WalletTransaction txn, List<WalletAction> actions, List<WalletAccountMapping> mappings) {
         Map<String, String> walletToAccount = mappings.stream().collect(Collectors.toMap(WalletAccountMapping::getWalletId, WalletAccountMapping::getAccountRefId));
 
         List<LedgerEntryPb> entries = new ArrayList<>();
@@ -154,7 +154,7 @@ public class ObjectBuilder {
         PostTransactionRequestPb req = PostTransactionRequestPb.newBuilder()
                 .setReferenceId(txn.getTxnId())
                 .addAllEntries(entries).build();
-        Outbox outbox = OutboxHelper.fromPostTransactionRequest(req, txn);
+        Outbox outbox = OutboxHelper.fromPostTransactionRequest(eventId, req, txn);
         return Result.success(outbox);
     }
 }

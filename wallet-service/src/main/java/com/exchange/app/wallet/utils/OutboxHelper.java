@@ -29,10 +29,13 @@ public class OutboxHelper {
             }}
     );
 
-    public static Outbox fromPostTransactionRequest(PostTransactionRequestPb requestPb, WalletTransaction txn) {
+    public static Outbox fromPostTransactionRequest(
+            String eventId,
+            PostTransactionRequestPb requestPb,
+            WalletTransaction txn) {
         return Outbox.create(
                 OutboxEventType.LEDGER_POST.code,
-                IdGenerator.generateEventId(txn.getTxnId()),
+                eventId,
                 txn.getTxnId(),
                 OutboxStatus.PENDING,
                 WalletTopic.POST_LEDGER,
