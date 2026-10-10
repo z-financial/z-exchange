@@ -130,8 +130,11 @@ adapter:
 3. Resolves the configured `internal-id` generator.
 4. Starts one generator instance for the process.
 5. Exposes a small application-facing `nextId()` operation.
-6. Maps allocation failures and reports runtime health.
-7. Closes the generator runtime before closing its pool.
+6. Maps library failures into a dedicated `IdGeneratorException` with stable
+   project error codes while preserving the original exception as its cause.
+7. Attaches non-secret service, domain, generator, and instance context to
+   operational logs.
+8. Closes the generator runtime before closing its pool.
 
 The adapter does not provision definitions, choose worker IDs, decode IDs for business
 logic, or provide a fallback. Wallet and Ledger supply their domain name through
@@ -157,7 +160,7 @@ not immediately stop generation, but it never extends the local safe deadline.
 When ownership is lost or the local safe deadline expires, the adapter shall:
 
 1. Stop accepting ID allocations.
-2. Mark readiness `OUT_OF_SERVICE`.
+2. Mark readiness `REFUSING_TRAFFIC`.
 3. Close the Spring application so the service process exits.
 4. Rely on Docker's restart policy to start a new process and acquire a safe worker.
 

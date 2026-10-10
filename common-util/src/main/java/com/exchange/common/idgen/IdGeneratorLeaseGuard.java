@@ -1,5 +1,6 @@
 package com.exchange.common.idgen;
 
+import com.exchange.common.exception.IdGeneratorException;
 import com.zed.idgen.snowflake.core.IdGenerator;
 import com.zed.idgen.snowflake.core.generator.IdGeneratorInstance;
 import org.slf4j.Logger;
@@ -24,6 +25,7 @@ public final class IdGeneratorLeaseGuard implements SmartLifecycle {
 
     private final IdGeneratorInstance generator;
     private final ConfigurableApplicationContext applicationContext;
+    private final IdGeneratorContext generatorContext;
     private final long checkIntervalMillis;
     private final AtomicBoolean running = new AtomicBoolean();
     private final AtomicBoolean shutdownStarted = new AtomicBoolean();
@@ -32,18 +34,27 @@ public final class IdGeneratorLeaseGuard implements SmartLifecycle {
     public IdGeneratorLeaseGuard(
             IdGenerator generator,
             ConfigurableApplicationContext applicationContext,
+            IdGeneratorContext generatorContext,
             long checkIntervalMillis) {
+        if (generatorContext == null) {
+            throw IdGeneratorException.configuration(null, "id generator context must not be null");
+        }
         if (!(generator instanceof IdGeneratorInstance instance)) {
-            throw new IllegalArgumentException("managed id generator must expose runtime ownership state");
+            throw IdGeneratorException.configuration(
+                    generatorContext,
+                    "managed id generator must expose runtime ownership state");
         }
         if (applicationContext == null) {
-            throw new IllegalArgumentException("application context must not be null");
+            throw IdGeneratorException.configuration(generatorContext, "application context must not be null");
         }
         if (checkIntervalMillis <= 0) {
-            throw new IllegalArgumentException("ownership check interval must be positive");
+            throw IdGeneratorException.configuration(
+                    generatorContext,
+                    "ownership check interval must be positive");
         }
         this.generator = instance;
         this.applicationContext = applicationContext;
+        this.generatorContext = generatorContext;
         this.checkIntervalMillis = checkIntervalMillis;
     }
 
@@ -82,9 +93,20 @@ public final class IdGeneratorLeaseGuard implements SmartLifecycle {
             return;
         }
         if (failure == null) {
-            LOGGER.error("ID generator ownership was lost; stopping the application for a safe restart");
+            LOGGER.error(
+                    "ID generator ownership was lost; stopping for a safe restart: service={}, domain={}, generator={}, instance={}",
+                    generatorContext.serviceName(),
+                    generatorContext.domainName(),
+                    generatorContext.generatorName(),
+                    generatorContext.serverInstanceId());
         } else {
-            LOGGER.error("ID generator ownership check failed; stopping the application for a safe restart", failure);
+            LOGGER.error(
+                    "ID generator ownership check failed; stopping for a safe restart: service={}, domain={}, generator={}, instance={}",
+                    generatorContext.serviceName(),
+                    generatorContext.domainName(),
+                    generatorContext.generatorName(),
+                    generatorContext.serverInstanceId(),
+                    failure);
         }
         /*
          * Close the context instead of reporting health alone. The Compose

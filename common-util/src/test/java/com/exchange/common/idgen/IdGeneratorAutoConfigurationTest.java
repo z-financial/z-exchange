@@ -1,6 +1,5 @@
 package com.exchange.common.idgen;
 
-import com.zed.idgen.snowflake.core.IdGenerator;
 import com.zed.idgen.snowflake.core.generator.IdGeneratorInstance;
 import com.zed.idgen.snowflake.core.manager.mysql.MysqlGeneratorRuntimeManager;
 import org.junit.jupiter.api.Test;
@@ -10,6 +9,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import javax.sql.DataSource;
 
 import static com.exchange.common.idgen.IdGeneratorAutoConfiguration.DATA_SOURCE_BEAN;
+import static com.exchange.common.idgen.IdGeneratorAutoConfiguration.CONTEXT_BEAN;
 import static com.exchange.common.idgen.IdGeneratorAutoConfiguration.GENERATOR_BEAN;
 import static com.exchange.common.idgen.IdGeneratorAutoConfiguration.INTERNAL_GENERATOR_BEAN;
 import static com.exchange.common.idgen.IdGeneratorAutoConfiguration.LEASE_GUARD_BEAN;
@@ -41,6 +41,7 @@ class IdGeneratorAutoConfigurationTest {
 
         contextRunner
                 .withPropertyValues(
+                        "spring.application.name=wallet-service",
                         "app.id-generator.enabled=true",
                         "app.id-generator.domain-name=z-exchange",
                         "app.id-generator.generator-name=wallet",
@@ -53,6 +54,7 @@ class IdGeneratorAutoConfigurationTest {
                     org.assertj.core.api.Assertions.assertThat(context.getBean(GENERATOR_BEAN))
                             .isSameAs(generator);
                     org.assertj.core.api.Assertions.assertThat(context)
+                            .hasBean(CONTEXT_BEAN)
                             .hasSingleBean(InternalIdGenerator.class)
                             .hasBean(INTERNAL_GENERATOR_BEAN)
                             .hasBean(LEASE_GUARD_BEAN);
@@ -70,6 +72,7 @@ class IdGeneratorAutoConfigurationTest {
 
         contextRunner
                 .withPropertyValues(
+                        "spring.application.name=wallet-service",
                         "app.id-generator.enabled=true",
                         "app.id-generator.domain-name=z-exchange-wallet",
                         "app.id-generator.generator-name=internal-id",

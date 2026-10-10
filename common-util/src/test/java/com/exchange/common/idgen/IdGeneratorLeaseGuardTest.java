@@ -15,6 +15,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class IdGeneratorLeaseGuardTest {
+    private static final IdGeneratorContext CONTEXT = new IdGeneratorContext(
+            "wallet-service",
+            "z-exchange-wallet",
+            "internal-id",
+            "wallet");
 
     @Test
     void keepsApplicationRunningWhileOwnershipIsSafe() {
@@ -22,7 +27,7 @@ class IdGeneratorLeaseGuardTest {
         ConfigurableApplicationContext context = mock(ConfigurableApplicationContext.class);
         when(generator.canGenerate()).thenReturn(true);
 
-        IdGeneratorLeaseGuard guard = new IdGeneratorLeaseGuard(generator, context, 1_000L);
+        IdGeneratorLeaseGuard guard = new IdGeneratorLeaseGuard(generator, context, CONTEXT, 1_000L);
         guard.start();
         guard.checkOwnership();
         guard.stop();
@@ -36,7 +41,7 @@ class IdGeneratorLeaseGuardTest {
         ConfigurableApplicationContext context = mock(ConfigurableApplicationContext.class);
         when(generator.canGenerate()).thenReturn(false);
 
-        IdGeneratorLeaseGuard guard = new IdGeneratorLeaseGuard(generator, context, 1_000L);
+        IdGeneratorLeaseGuard guard = new IdGeneratorLeaseGuard(generator, context, CONTEXT, 1_000L);
         guard.start();
         guard.checkOwnership();
         guard.stop();
@@ -53,7 +58,7 @@ class IdGeneratorLeaseGuardTest {
         });
         context.refresh();
         when(generator.canGenerate()).thenReturn(false);
-        IdGeneratorLeaseGuard guard = new IdGeneratorLeaseGuard(generator, context, 1_000L);
+        IdGeneratorLeaseGuard guard = new IdGeneratorLeaseGuard(generator, context, CONTEXT, 1_000L);
         guard.start();
 
         assertThrows(IllegalStateException.class, guard::checkOwnership);
