@@ -4,6 +4,7 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import com.zed.idgen.snowflake.core.IdGenerator;
 import com.zed.idgen.snowflake.core.manager.mysql.MysqlGeneratorRuntimeManager;
+import com.zed.idgen.snowflake.core.manager.mysql.MysqlGeneratorRuntimeConfig;
 import com.zed.idgen.snowflake.core.manager.mysql.dao.MysqlDaoFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
@@ -12,6 +13,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.ConfigurableApplicationContext;
 
 import javax.sql.DataSource;
 
@@ -28,6 +30,8 @@ public class IdGeneratorAutoConfiguration {
     public static final String DAO_FACTORY_BEAN = "idGeneratorDaoFactory";
     public static final String RUNTIME_MANAGER_BEAN = "idGeneratorRuntimeManager";
     public static final String GENERATOR_BEAN = "zIdGenerator";
+    public static final String INTERNAL_GENERATOR_BEAN = "internalIdGenerator";
+    public static final String LEASE_GUARD_BEAN = "idGeneratorLeaseGuard";
 
     @Bean(name = DATA_SOURCE_BEAN, destroyMethod = "close")
     @ConditionalOnMissingBean(name = DATA_SOURCE_BEAN)
@@ -72,10 +76,22 @@ public class IdGeneratorAutoConfiguration {
         if (properties.getServerInstanceId().trim().length() > 27) {
             throw new IllegalArgumentException("app.id-generator.server-instance-id must not exceed 27 characters");
         }
+        IdGeneratorProperties.Runtime runtime = properties.getRuntime();
+        MysqlGeneratorRuntimeConfig runtimeConfig = new MysqlGeneratorRuntimeConfig(
+                runtime.getLeaseTermSeconds(),
+                runtime.getLocalSafeTermMillis(),
+                runtime.getClockSkewWindowMillis(),
+                runtime.getReuseSafetyMarginMillis(),
+                runtime.getRenewIntervalMillis(),
+                runtime.getCleanerIntervalMillis(),
+                runtime.getRenewCorePoolSize(),
+                runtime.getRenewMaxPoolSize(),
+                runtime.getRenewQueueSize());
         return new MysqlGeneratorRuntimeManager(
                 daoFactory,
                 properties.getDomainName().trim(),
-                properties.getServerInstanceId().trim());
+                properties.getServerInstanceId().trim(),
+                runtimeConfig);
     }
 
     @Bean(name = GENERATOR_BEAN)
@@ -86,6 +102,25 @@ public class IdGeneratorAutoConfiguration {
         requireText(properties.getGeneratorName(), "app.id-generator.generator-name");
         long generatorId = runtimeManager.resolveGeneratorId(properties.getGeneratorName().trim());
         return runtimeManager.startGeneratorInstance(generatorId);
+    }
+
+    @Bean(name = INTERNAL_GENERATOR_BEAN)
+    @ConditionalOnMissingBean(InternalIdGenerator.class)
+    public InternalIdGenerator internalIdGenerator(
+            @Qualifier(GENERATOR_BEAN) IdGenerator generator) {
+        return new ManagedInternalIdGenerator(generator);
+    }
+
+    @Bean(name = LEASE_GUARD_BEAN)
+    @ConditionalOnMissingBean(IdGeneratorLeaseGuard.class)
+    public IdGeneratorLeaseGuard idGeneratorLeaseGuard(
+            @Qualifier(GENERATOR_BEAN) IdGenerator generator,
+            ConfigurableApplicationContext applicationContext,
+            IdGeneratorProperties properties) {
+        return new IdGeneratorLeaseGuard(
+                generator,
+                applicationContext,
+                properties.getRuntime().getOwnershipCheckIntervalMillis());
     }
 
     private static void requireText(String value, String propertyName) {

@@ -16,6 +16,13 @@ services:
       DB_NAME: ${LEDGER_DB_NAME:-trade_ledgerservice}
       DB_USERNAME: ${LEDGER_DB_USERNAME:-ledger}
       DB_PASSWORD: ${LEDGER_DB_PASSWORD:-ledger-local}
+      ID_GENERATOR_ENABLED: "true"
+      ID_GENERATOR_DOMAIN: z-exchange-ledger
+      ID_GENERATOR_NAME: internal-id
+      ID_GENERATOR_INSTANCE_ID: ledger
+      ID_GENERATOR_DB_URL: "jdbc:mysql://${INFRA_PRIVATE_IP:-172.31.18.211}:${DB_PORT:-3306}/z_id_generator?serverTimezone=UTC&characterEncoding=utf-8&useSSL=false"
+      ID_GENERATOR_DB_USERNAME: ${ID_GENERATOR_DB_USERNAME:-zid_runtime}
+      ID_GENERATOR_DB_PASSWORD: ${ID_GENERATOR_DB_PASSWORD:-zid-local}
       REDIS_HOST: ${INFRA_PRIVATE_IP:-172.31.18.211}
       REDIS_PORT: ${REDIS_PORT:-6379}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-172.31.28.6:9092}

@@ -100,18 +100,18 @@ management:
 
 app:
   id-generator:
-    # Opt-in until the shared z_id_generator schema has been provisioned.
-    enabled: ${ID_GENERATOR_ENABLED:false}
-    domain-name: ${ID_GENERATOR_DOMAIN:z-exchange}
-    generator-name: ${ID_GENERATOR_NAME:ledger}
+    # ID-creating writes fail at startup when the managed runtime is unavailable.
+    enabled: ${ID_GENERATOR_ENABLED:true}
+    domain-name: ${ID_GENERATOR_DOMAIN:z-exchange-ledger}
+    generator-name: ${ID_GENERATOR_NAME:internal-id}
     # Must be <= 27 characters; the lease layer appends a UUID owner token.
     server-instance-id: ${ID_GENERATOR_INSTANCE_ID:ledger}
     default-statement-timeout-seconds: ${ID_GENERATOR_DB_STATEMENT_TIMEOUT_SECONDS:5}
     lease-request-timeout-seconds: ${ID_GENERATOR_LEASE_TIMEOUT_SECONDS:2}
     data-source:
       jdbc-url: ${ID_GENERATOR_DB_URL:jdbc:mysql://localhost:3306/z_id_generator?serverTimezone=UTC&characterEncoding=utf-8&useSSL=false}
-      username: ${ID_GENERATOR_DB_USERNAME:root}
-      password: ${ID_GENERATOR_DB_PASSWORD:0000}
+      username: ${ID_GENERATOR_DB_USERNAME:zid_runtime}
+      password: ${ID_GENERATOR_DB_PASSWORD:zid-local}
       driver-class-name: com.mysql.cj.jdbc.Driver
       maximum-pool-size: ${ID_GENERATOR_DB_MAX_POOL_SIZE:4}
       minimum-idle: ${ID_GENERATOR_DB_MIN_IDLE:1}
@@ -119,6 +119,17 @@ app:
       validation-timeout-millis: ${ID_GENERATOR_DB_VALIDATION_TIMEOUT_MS:1000}
       max-lifetime-millis: ${ID_GENERATOR_DB_MAX_LIFETIME_MS:1500000}
       keepalive-time-millis: ${ID_GENERATOR_DB_KEEPALIVE_TIME_MS:300000}
+    runtime:
+      lease-term-seconds: ${ID_GENERATOR_LEASE_TERM_SECONDS:10}
+      local-safe-term-millis: ${ID_GENERATOR_LOCAL_SAFE_TERM_MS:8000}
+      clock-skew-window-millis: ${ID_GENERATOR_CLOCK_SKEW_WINDOW_MS:1000}
+      reuse-safety-margin-millis: ${ID_GENERATOR_REUSE_SAFETY_MARGIN_MS:100}
+      renew-interval-millis: ${ID_GENERATOR_RENEW_INTERVAL_MS:5000}
+      cleaner-interval-millis: ${ID_GENERATOR_CLEANER_INTERVAL_MS:1000}
+      renew-core-pool-size: ${ID_GENERATOR_RENEW_CORE_POOL_SIZE:2}
+      renew-max-pool-size: ${ID_GENERATOR_RENEW_MAX_POOL_SIZE:4}
+      renew-queue-size: ${ID_GENERATOR_RENEW_QUEUE_SIZE:1024}
+      ownership-check-interval-millis: ${ID_GENERATOR_OWNERSHIP_CHECK_INTERVAL_MS:1000}
 
   db:
     query:
