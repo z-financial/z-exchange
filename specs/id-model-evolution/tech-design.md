@@ -1,8 +1,9 @@
 # Technical Design — Internal ID and Typed Reference Evolution
 
-Status: Proposed | Last updated: 2026-10-01
+Status: Proposed | Last updated: 2026-10-10
 
 Related documents: [SPEC](./spec.md) | [Implementation tasks](./tasks.md) |
+[Identity rename matrix](./identity-rename-matrix.md) |
 [Generator integration SPEC](../id-generator-integration/spec.md)
 
 ## 1. Purpose and boundaries
@@ -31,6 +32,7 @@ dual writes, backfills, or legacy aliases.
 The following remain outside this phase:
 
 - BalanceSnapshot identity redesign or a `balance_ref`;
+- diagnostic decoding of generator time, worker, or sequence fields;
 - reference-format version and generator-version fields;
 - routing, sharding, buckets, and physical partition metadata; and
 - generated numeric values above `Long.MAX_VALUE`.
@@ -74,9 +76,33 @@ domain, worker, bucket, partition, or storage location.
 The type registry must distinguish every covered domain entity. Equal numeric
 IDs from different generator domains therefore remain different references.
 
-Before implementation, the project must fix the permanent type codes,
-encoding alphabet, checksum algorithm, maximum length, and validation errors.
-Once issued, a type code must never be reassigned to another entity meaning.
+The permanent format is fixed as follows:
+
+- type codes are the three-character values in the registry below;
+- `ENC_INTERNAL_ID` is the canonical case-sensitive Base62 representation,
+  using `0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz` and
+  left-padded with `0` to exactly 11 characters;
+- `CHK` is the six-character, zero-padded Base62 encoding of the
+  CRC32C of the ASCII payload `<TYPE>-<ENC_INTERNAL_ID>`;
+- every entity reference is exactly 22 characters;
+- reference columns use the ASCII character set and a binary collation so
+  Base62 letter case remains significant; and
+- only numeric values in `1..Long.MAX_VALUE` are valid.
+
+| Entity | Type code | Allocator domain |
+| --- | --- | --- |
+| Wallet | `WAL` | `z-exchange-wallet` |
+| Wallet transaction | `WTX` | `z-exchange-wallet` |
+| Wallet reservation | `WRS` | `z-exchange-wallet` |
+| Wallet action | `WAC` | `z-exchange-wallet` |
+| Ledger account | `LAC` | `z-exchange-ledger` |
+| Ledger transaction | `LTX` | `z-exchange-ledger` |
+| Ledger entry | `LEN` | `z-exchange-ledger` |
+
+Once issued, a type code is never changed or reassigned. Within one
+environment, exactly one allocator domain may issue a given type. This rule is
+what makes equal numeric IDs from the Wallet and Ledger domains globally
+distinct; the checksum is error detection and does not provide uniqueness.
 
 Typed entity references are canonical identities for:
 
@@ -118,6 +144,12 @@ interface EntityRefCodec {
 
 record DecodedEntityRef(EntityRefType type, long internalId) {}
 
+record GeneratedEntityIdentity(long internalId, String reference) {}
+
+interface EntityIdentityFactory {
+    GeneratedEntityIdentity next(EntityRefType type);
+}
+
 interface EventRefFactory {
     String newRequestRef(long outboxInternalId);
     String replyRef(String requestEventRef, String outcome);
@@ -132,6 +164,11 @@ The codec shall:
 - round-trip the entity type and `internal_id` without precision loss; and
 - operate without database or network access.
 
+Validation uses the controlled `entity_reference` error namespace with the
+codes `MALFORMED`, `UNKNOWN_TYPE`, `CHECKSUM_INVALID`, `OVER_LENGTH`,
+`OUT_OF_RANGE`, and `UNEXPECTED_TYPE`. Callers that expect a specific entity
+must use expected-type decoding rather than decode and route on their own.
+
 The type registry is an identity protocol registry, not a place for Wallet or
 Ledger business rules. The codec must not route requests, authorize access, or
 branch on entity business behavior. `EventRefFactory` owns only canonical
@@ -139,9 +176,10 @@ message-reference construction; the caller supplies the already classified
 reply outcome.
 
 The existing managed `z-id-generator` bean remains the only source of new
-`internal_id` values. Allocation and reference encoding happen before an
-insert, and both values are committed in the same transaction as the entity
-and any required outbox row.
+`internal_id` values. `EntityIdentityFactory` allocates and encodes one
+immutable pair so the row key and reference cannot diverge. The caller invokes
+the factory before its database transaction; both values are then committed in
+the same transaction as the entity and any required outbox row.
 
 ## 4. Schema cutover
 
@@ -210,10 +248,10 @@ the authoritative cross-service relationship.
 
 ### 4.4 Indexes and assigned IDs
 
-All covered MyBatis models replace `@TableId(type = IdType.AUTO)` with assigned
-ID behavior and rename `id` accessors to `internalId`. Insert builders must
-require both identity fields instead of supplying `0L` for an auto-increment
-key.
+All covered MyBatis models replace `@TableId(type = IdType.AUTO)` with
+`@TableId(value = "internal_id", type = IdType.INPUT)` and rename `id`
+accessors to `internalId`. Insert builders must require both identity fields
+instead of supplying `0L` for an auto-increment key.
 
 Indexes that currently target generated string IDs move to the corresponding
 typed reference. Compound business/idempotency constraints remain unchanged
@@ -245,8 +283,9 @@ outbox payload fixtures change in the same cutover.
 
 Cache scopes and keys migrate from generated legacy IDs to typed references.
 This does not change existing stable/versioned cache behavior or CAS rules.
-Structured logs use entity-specific `*_ref` keys. An owner service may log
-`internal_id` as additional diagnostic data, but correlation uses typed refs.
+Structured production logs use entity-specific `*_ref` keys and do not expose
+`internal_id`. Restricted database and operational tooling may inspect the
+stored key, but application correlation always uses typed references.
 
 ## 6. Event and outbox flow
 
@@ -273,7 +312,8 @@ Wallet and Ledger event references use distinct canonical namespaces so a
 request and reply cannot collide. The exact namespace and deterministic reply
 encoding are finalized with the entity-reference format decisions. Event
 references are validated as message references and are excluded from the
-entity codec's decode-to-`internal_id` invariant.
+entity codec's decode-to-`internal_id` invariant. Their deterministic request
+and reply construction belongs to the event/outbox task, not the entity codec.
 
 Outbox same-intent comparison, lookups, status changes, publisher metrics, and
 logs migrate from `event_id`/`command_id` to `event_ref`/`command_ref` without
@@ -315,15 +355,12 @@ The existing rules remain unchanged: Wallet owns business decisions and
 balance invariants, Ledger remains a passive double-entry journal, outbox rows
 commit with business state, and Redis/DB idempotency behavior is preserved.
 
-## 8. Diagnostic decoding
+## 8. ID opacity
 
-`z-id-generator` may expose a diagnostic decoder that accepts the configured
-epoch and layout and reports approximate time, worker, and sequence fields.
-
-The decoder is for tests, logs, and operational tools only. Business modules
-must not use decoded values for routing, ordering, validation, authorization,
-uniqueness, or any other correctness decision. The reference codec is the only
-supported parser for `*_ref` values.
+Diagnostic decoding of generator time, worker, and sequence fields is deferred.
+Business modules must not decode generated IDs or use their values for routing,
+ordering, validation, authorization, uniqueness, or another correctness
+decision. The reference codec is the only supported parser for `*_ref` values.
 
 No generator-version bits are introduced. The configured generator layout and
 epoch remain immutable for issued IDs, and the dependency version remains
@@ -348,7 +385,7 @@ pinned as required by the generator integration SPEC.
 
 1. Finalize the reference registry, encoding, checksum, length, and controlled
    error contract.
-2. Add the generic codec and diagnostic decoder tests.
+2. Add the generic codec and MySQL/MyBatis numeric-contract tests.
 3. Change standard Wallet and Ledger schemas to assigned `internal_id` keys,
    typed references, renamed relationships, and updated indexes.
 4. Migrate Wallet persistence, transaction builders, caches, APIs, and tests.
@@ -362,20 +399,13 @@ pinned as required by the generator integration SPEC.
 The schema and code change together; this sequence is for implementation
 organization, not for mixed-version deployment.
 
-## 11. Decisions required before implementation
+## 11. Remaining event-task decisions
 
-1. Permanent entity type codes plus distinct Wallet-event and Ledger-event
-   namespaces.
-2. Reference encoding alphabet, checksum algorithm, and maximum length.
-3. Controlled error codes for malformed, unknown-type, checksum-invalid, and
-   unresolved references.
-4. Final treatment and names of each current caller-owned `reference_id` and
-   redundant `wallet_reference_id` field.
-5. Exact MyBatis assigned-ID annotation and the range guard used before
-   persistence.
-6. Final outbox DDL and cursor query using `internal_id`.
-7. The complete protobuf field rename matrix while preserving applicable field
-   numbers.
-8. The deterministic Ledger reply-reference encoding and canonical outcome
-   vocabulary.
+The entity-reference registry, encoding, checksum, length, controlled errors,
+and schema/protobuf rename matrix are fixed by this design and its linked
+matrix. The event/outbox task still owns:
+
+1. distinct Wallet-request and Ledger-reply event namespaces;
+2. deterministic Ledger reply-reference encoding and canonical outcomes; and
+3. final outbox DDL and retry cursor SQL using `internal_id`.
 

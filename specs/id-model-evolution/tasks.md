@@ -14,7 +14,7 @@ Done when:
 - The codec creates and parses `<TYPE>-<ENC_INTERNAL_ID>-<CHK>` references locally and deterministically.
 - Covered persistence models support generated `internal_id BIGINT UNSIGNED` values in `1..Long.MAX_VALUE`.
 - MyBatis round-trips `1`, representative values, and `Long.MAX_VALUE` without sign or precision changes.
-- The diagnostic generator decoder is available, but production business logic does not depend on decoded fields.
+- Production business logic does not decode generated IDs or depend on their fields or ordering.
 
 ## Task 2 — Migrate Wallet identities
 

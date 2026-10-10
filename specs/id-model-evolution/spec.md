@@ -1,6 +1,6 @@
 # Internal ID and Typed Reference Evolution
 
-Status: Proposed | Last updated: 2026-10-01
+Status: Proposed | Last updated: 2026-10-10
 
 ## 1. Context
 
@@ -38,8 +38,8 @@ entities still adopt the new names and values. Other supporting tables receive n
 above, but references they store to covered entities still migrate.
 
 Caller-provided business references and idempotency keys remain separate and unchanged. Sharding/routing metadata,
-BalanceSnapshot identity, generator-version bits, and Java support above `Long.MAX_VALUE` are outside scope. No
-dual fields, dual writes, backfill, or legacy reads are required.
+BalanceSnapshot identity, generator-version bits, diagnostic generator decoding, and Java support above
+`Long.MAX_VALUE` are outside scope. No dual fields, dual writes, backfill, or legacy reads are required.
 
 ## 3. Design
 
@@ -85,11 +85,10 @@ Retry scanning uses `(next_attempt_at, internal_id)` as cursor and index order. 
 defer a concurrent eligible row by one retry cycle. This latency is accepted, but repeated cycles must eventually
 select every eligible row without starvation.
 
-### 3.4 Decoding and inherited behavior
+### 3.4 Opacity and inherited behavior
 
-`z-id-generator` shall expose a diagnostic decoder that accepts the correct epoch and layout and reports
-approximate time, worker, and sequence. Business code must not use decoded fields for routing, ordering,
-validation, authorization, or correctness.
+No diagnostic generator decoder is introduced in this phase. Business code must not decode internal IDs or use
+their fields or ordering for routing, validation, authorization, or correctness.
 
 Worker leasing, one generator per process, pool isolation, fail-closed ownership, clock-skew policy, sequence
 handling, lifecycle, observability, and fixed dependency/layout configuration remain governed by the integration
@@ -126,7 +125,7 @@ stored references, and polling eventually selects rows despite accepted single-c
 Existing generator ownership, fail-closed behavior, isolation, clock-skew acceptance, and operational signals
 remain unchanged. Reference encoding is local and deterministic with no per-ID database call. Java/MyBatis must
 round-trip the current positive `Long` range through `BIGINT UNSIGNED` without sign or precision changes. The
-generator decoder is diagnostic-only and must not become a business dependency.
+numeric ID remains opaque outside owner persistence.
 
 ## 5. Failure Behavior
 
@@ -165,8 +164,8 @@ reply reference. Cursor tests prove eventual selection of concurrently inserted 
 ### AC-5 — Uniqueness and decoding boundaries
 
 Reference tests cover every type and prove uniqueness across both service domains within one environment. Codec
-round trips recover type and internal ID; generator-decoder tests recover expected diagnostic fields, while
-business modules do not depend on those fields or ID ordering.
+round trips recover type and internal ID, while business modules do not decode generated IDs or depend on their
+fields or ordering.
 
 ### AC-6 — Runtime and numeric safety
 

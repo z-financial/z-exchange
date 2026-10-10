@@ -1,2 +1,3 @@
 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-com.exchange.common.idgen.IdGeneratorAutoConfiguration
+com.exchange.common.idgen.IdGeneratorAutoConfiguration,\
+com.exchange.common.identity.EntityReferenceAutoConfiguration

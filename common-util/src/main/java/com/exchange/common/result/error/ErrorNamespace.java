@@ -8,4 +8,5 @@ public class ErrorNamespace {
     public static final String OUTBOX = "outbox";
     public static final String KAFKA = "kafka";
     public static final String ID_GENERATOR = "id_generator";
+    public static final String ENTITY_REFERENCE = "entity_reference";
 }
