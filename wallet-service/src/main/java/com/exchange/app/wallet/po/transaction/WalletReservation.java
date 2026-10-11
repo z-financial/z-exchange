@@ -23,7 +23,7 @@ public class WalletReservation {
     private Long internalId;
     private String walletReservationRef;
     private ServiceId initiator;
-    private String referenceId;
+    private String walletReservationBusinessRef;
     private String walletRef;
     private String assetId;
     private Long total;
@@ -54,12 +54,14 @@ public class WalletReservation {
     }
 
     static public WalletReservation create(Long internalId, String walletReservationRef,
-                                           ServiceId initiator, String referenceId, String walletRef,
+                                           ServiceId initiator, String walletReservationBusinessRef,
+                                           String walletRef,
                                            String assetId, Long total, Long remaining, Long consumed,
                                            Long pendingSettle, Long released,
                                            ReservationStatus reservationStatus,
                                            ReservationOutcome reservationOutcome, String reserveWalletTxnRef) {
-        return new WalletReservation(internalId, walletReservationRef, initiator, referenceId, walletRef,
+        return new WalletReservation(internalId, walletReservationRef, initiator,
+                walletReservationBusinessRef, walletRef,
                 assetId, total, remaining, consumed, pendingSettle, released, reservationStatus,
                 reservationOutcome, reserveWalletTxnRef);
     }

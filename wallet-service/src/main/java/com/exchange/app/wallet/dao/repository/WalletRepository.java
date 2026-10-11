@@ -22,10 +22,10 @@ public class WalletRepository extends DbBaseRepository<Wallet, WalletMapper> {
                 .eq(Wallet::getWalletRef, walletRef));
     }
 
-    public Wallet selectByReferenceId(ServiceId serviceId, String referenceId) {
+    public Wallet selectByWalletBusinessRef(ServiceId serviceId, String walletBusinessRef) {
         return mapper.selectOne(queryLambdaWrapper()
                 .eq(Wallet::getServiceId, serviceId)
-                .eq(Wallet::getReferenceId, referenceId));
+                .eq(Wallet::getWalletBusinessRef, walletBusinessRef));
     }
 
     public int updateWalletStatus(String walletRef, WalletStatus oldStatus, WalletStatus newStatus) {

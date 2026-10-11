@@ -25,6 +25,10 @@ import java.util.stream.Collectors;
 public class TransactionValidateHelper {
     // simply precheck, validate simple rules like enum and amount>0
     public static Result<Void> requestPrecheck(RequestInfo requestInfo) {
+        if (Strings.isEmpty(requestInfo.upstreamRequestRef)) {
+            return Result.failure(WalletServiceErrorCode.INVALID_REQUEST_PARAMETER,
+                    "upstream request reference is required");
+        }
         ServiceId serviceId = EnumPbMappers.serviceIdPbMapper.to(requestInfo.serviceIdPb);
         if (serviceId == null || serviceId == ServiceId.UNKNOWN) {
             log.error("invalid service id, serviceId: {}", requestInfo.serviceIdPb);

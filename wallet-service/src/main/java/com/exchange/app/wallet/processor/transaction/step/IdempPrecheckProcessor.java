@@ -66,11 +66,13 @@ public class IdempPrecheckProcessor {
             }
         }
 
-        WalletTransaction walletTxn = idempDbCheck(requestInfo.serviceIdPb, requestInfo.idempotenceKey);
+        WalletTransaction walletTxn = idempDbCheck(
+                requestInfo.serviceIdPb, requestInfo.upstreamRequestRef);
         if (walletTxn != null) {
             // set idemp to DONE when found wallet txn
             Result<Void> markDoneResult = idempotencyClient.markIdempDone(
-                    GlobalServiceId.WALLET.code, Constant.SCOPE, requestInfo.idempotenceKey,
+                    GlobalServiceId.WALLET.code, Constant.SCOPE,
+                    requestInfo.idempotencyCacheKey(),
                     String.valueOf(requestInfo.getStableHash()), requestInfo.token, walletTxn.getWalletTxnRef(),
                     JitterHelper.jitter(idempConfig.getDoneTtl(), idempConfig.getJitterMs()));
             if (markDoneResult.isFailed()) {
@@ -91,9 +93,10 @@ public class IdempPrecheckProcessor {
     // return idemp info in the cache when fail to set
     private Result<IdempValue> claimIdempCacheIfAbsent(RequestInfo requestInfo) {
         String globalCode = GlobalServiceId.WALLET.code;
+        String idempotencyCacheKey = requestInfo.idempotencyCacheKey();
         String reqHash = requestInfo.getStableHash();
         Result<Boolean> claimResult = idempotencyClient.claimIdempIfAbsent(
-                globalCode, Constant.SCOPE, requestInfo.idempotenceKey,
+                globalCode, Constant.SCOPE, idempotencyCacheKey,
                 reqHash, requestInfo.token, JitterHelper.jitter(idempConfig.getPendingTtl(), idempConfig.getJitterMs()));
         if (claimResult.isFailed()) {
             // Redis accelerates idempotency; its failure degrades to the authoritative DB check.
@@ -105,7 +108,7 @@ public class IdempPrecheckProcessor {
         }
 
         Result<IdempValue> valueResult = idempotencyClient.getIdempAndVerifyHash(
-                globalCode, Constant.SCOPE, requestInfo.idempotenceKey, reqHash);
+                globalCode, Constant.SCOPE, idempotencyCacheKey, reqHash);
         if (valueResult.isFailed()) {
             if (Result.is(valueResult, IdempErrorCode.HASH_CONFLICT)) {
                 return Result.failure(WalletServiceErrorCode.REQUEST_HASH_CONFLICT, valueResult.getDetail());
@@ -113,7 +116,7 @@ public class IdempPrecheckProcessor {
             if (Result.is(valueResult, RedisErrorCode.MALFORMED_VALUE)) {
                 log.error("parse wallet idempotency value failed, deleting malformed Redis entry");
                 Result<Boolean> deleteResult = idempotencyClient.forceDeleteIdemp(
-                        globalCode, Constant.SCOPE, requestInfo.idempotenceKey);
+                        globalCode, Constant.SCOPE, idempotencyCacheKey);
                 if (deleteResult.isFailed()) {
                     log.warn("delete malformed wallet idempotency value failed, result={}", deleteResult);
                 }
@@ -125,13 +128,15 @@ public class IdempPrecheckProcessor {
         return valueResult;
     }
 
-    private WalletTransaction idempDbCheck(ServiceIdPb serviceIdPb, String idempotencyKey) {
+    private WalletTransaction idempDbCheck(
+            ServiceIdPb serviceIdPb,
+            String upstreamRequestRef) {
         // TODO(idempotency-db-authority): Persist the canonical request hash with Wallet's DB
-        //  idempotency record and compare it on every DB fallback/replay. The same initiator/key with
-        //  the same hash must replay the stored result; a different hash must return HASH_CONFLICT even
-        //  after Redis loss or expiry. Target design:
+        //  transaction and compare it on every DB fallback/replay. The same
+        //  (initiator, upstream_request_ref) with the same hash must replay the stored result;
+        //  a different hash must return HASH_CONFLICT even after Redis loss or expiry. Target design:
         //  design/proposals/redis-idempotency-db-authoritative.md.
         ServiceId serviceId = EnumPbMappers.serviceIdPbMapper.to(serviceIdPb);
-        return walletTransactionManager.selectByIdempotencyKey(serviceId, idempotencyKey);
+        return walletTransactionManager.selectByUpstreamRequestRef(serviceId, upstreamRequestRef);
     }
 }

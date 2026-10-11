@@ -9,11 +9,10 @@ import "wallet/wallet_enum.proto";
 import "com/exchange/proto/common/error.proto";
 
 message AtomicTransactionRequestPb {
-  string reference_id = 1;
+  string upstream_request_ref = 1;
   ServiceIdPb initiator = 2;
-  string idempotency_key = 3;
-  BusinessTypePb business_type = 4;
-  repeated TransactionLinePb lines = 5;
+  BusinessTypePb business_type = 3;
+  repeated TransactionLinePb lines = 4;
 }
 
 message AtomicTransactionReplyPb {
@@ -23,11 +22,10 @@ message AtomicTransactionReplyPb {
 }
 
 message ReserveTransactionRequestPb {
-  string reference_id = 1;
+  string upstream_request_ref = 1;
   ServiceIdPb initiator = 2;
-  string idempotency_key = 3;
-  BusinessTypePb business_type = 4;
-  repeated TransactionLinePb lines = 5;
+  BusinessTypePb business_type = 3;
+  repeated TransactionLinePb lines = 4;
 }
 
 message ReserveTransactionReplyPb {
@@ -38,11 +36,10 @@ message ReserveTransactionReplyPb {
 }
 
 message TwoStepTransactionRequestPb {
-  string reference_id = 1;
+  string upstream_request_ref = 1;
   ServiceIdPb initiator = 2;
-  string idempotency_key = 3;
-  BusinessTypePb business_type = 4;
-  repeated TransactionLinePb lines = 5;
+  BusinessTypePb business_type = 3;
+  repeated TransactionLinePb lines = 4;
 }
 
 message TwoStepTransactionReplyPb {
@@ -52,11 +49,10 @@ message TwoStepTransactionReplyPb {
 }
 
 message ApplyReservationTransactionRequestPb   {
-  string reference_id = 1;
+  string upstream_request_ref = 1;
   ServiceIdPb initiator = 2;
-  string idempotency_key = 3;
-  BusinessTypePb business_type = 4;
-  repeated TransactionLinePb lines = 5;
+  BusinessTypePb business_type = 3;
+  repeated TransactionLinePb lines = 4;
 }
 
 message ApplyReservationTransactionReplyPb {

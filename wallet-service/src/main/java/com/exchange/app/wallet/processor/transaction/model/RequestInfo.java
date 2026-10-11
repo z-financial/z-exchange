@@ -12,9 +12,8 @@ import java.util.Comparator;
 import java.util.List;
 
 public class RequestInfo {
-    public final String referenceId;
+    public final String upstreamRequestRef;
     public final ServiceIdPb serviceIdPb;
-    public final String idempotenceKey;
     public final BusinessTypePb businessTypePb;
     public final TransactionType transactionType;
     public final List<TransactionLinePb> linePbs;
@@ -25,10 +24,11 @@ public class RequestInfo {
 
     private String stableHash;
 
-    public RequestInfo(String referenceId, ServiceIdPb serviceIdPb, String idempotenceKey, BusinessTypePb businessTypePb, TransactionType transactionType, List<TransactionLinePb> linePbs, String requestName, String token) {
-        this.referenceId = referenceId;
+    public RequestInfo(String upstreamRequestRef, ServiceIdPb serviceIdPb,
+                       BusinessTypePb businessTypePb, TransactionType transactionType,
+                       List<TransactionLinePb> linePbs, String requestName, String token) {
+        this.upstreamRequestRef = upstreamRequestRef;
         this.serviceIdPb = serviceIdPb;
-        this.idempotenceKey = idempotenceKey;
         this.businessTypePb = businessTypePb;
         this.transactionType = transactionType;
         this.linePbs = linePbs;
@@ -42,9 +42,8 @@ public class RequestInfo {
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append(referenceId).append("|")
+        sb.append(upstreamRequestRef).append("|")
                 .append(serviceIdPb).append("|")
-                .append(idempotenceKey).append("|")
                 .append(businessTypePb).append("|")
                 .append(transactionType).append("|")
                 .append(requestName);
@@ -64,5 +63,10 @@ public class RequestInfo {
         }
         stableHash = StableHashHelper.stableHash(sb.toString());
         return stableHash;
+    }
+
+    /** Redis key for the same identity enforced by the database unique constraint. */
+    public String idempotencyCacheKey() {
+        return serviceIdPb.getNumber() + ":" + upstreamRequestRef;
     }
 }

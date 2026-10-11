@@ -26,14 +26,13 @@ import java.util.stream.Collectors;
 public class ObjectBuilder {
     public static WalletTransaction createTransaction(GeneratedEntityIdentity identity,
                                                       TransactionType transactionType,
-                                                      String referenceId, ServiceId serviceId,
-                                                      String idempotencyKey, BusinessType businessType) {
+                                                      String upstreamRequestRef, ServiceId serviceId,
+                                                      BusinessType businessType) {
         return WalletTransaction.create(
                 identity.internalId(),
                 identity.reference(),
-                referenceId,
+                upstreamRequestRef,
                 serviceId,
-                idempotencyKey,
                 TransactionStatus.PENDING,
                 transactionType,
                 businessType
@@ -51,7 +50,7 @@ public class ObjectBuilder {
                         identity.internalId(),
                         identity.reference(),
                         walletTransaction.getInitiator(),
-                        walletTransaction.getReferenceId() + ":" + walletRef,
+                        walletTransaction.getUpstreamRequestRef() + ":" + walletRef,
                         walletRef,
                         line.getAssetCode(),
                         line.getAmount(),
@@ -68,7 +67,7 @@ public class ObjectBuilder {
                         identity.internalId(),
                         identity.reference(),
                         walletTransaction.getInitiator(),
-                        walletTransaction.getReferenceId() + ":" + walletRef,
+                        walletTransaction.getUpstreamRequestRef() + ":" + walletRef,
                         walletRef,
                         line.getAssetCode(),
                         line.getAmount(),

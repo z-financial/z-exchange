@@ -58,14 +58,16 @@ public class CreateWalletProcessor {
             return replyError(result);
         }
 
-        Wallet walletInDb = walletManager.selectByReferenceId(serviceId, req.getReferenceId());
+        Wallet walletInDb = walletManager.selectByWalletBusinessRef(
+                serviceId, req.getWalletBusinessRef());
         if (walletInDb != null) {
             if (!matchesRequest(walletInDb, req, serviceId, ownerType)) {
                 return replyError(WalletServiceErrorCode.WALLET_INFO_MISMATCH,
                         "wallet reference already exists with different attributes");
             }
             if (walletInDb.getWalletStatus().hasInitiated()) {
-                balanceSnapshotStore.postInsert(walletInDb.getWalletRef(), walletInDb.getServiceId(), walletInDb.getReferenceId(), walletInDb.getOwnerType());
+                balanceSnapshotStore.postInsert(walletInDb.getWalletRef(), walletInDb.getServiceId(),
+                        walletInDb.getWalletBusinessRef(), walletInDb.getOwnerType());
                 return replySuccess(walletInDb.getWalletRef(), "wallet has been created");
             }
         } else {
@@ -91,6 +93,10 @@ public class CreateWalletProcessor {
     }
 
     private Result<Void> validateReq(CreateWalletRequestPb req, ServiceId serviceId, OwnerType ownerType) {
+        if (req.getWalletBusinessRef().isBlank()) {
+            return Result.failure(WalletServiceErrorCode.INVALID_REQUEST_PARAMETER,
+                    "wallet_business_ref is required");
+        }
         if (serviceId == null || serviceId == ServiceId.UNKNOWN) {
             return Result.failure(WalletServiceErrorCode.INVALID_REQUEST_PARAMETER, "invalid_service_id: " + req.getServiceId());
         }
@@ -105,13 +111,15 @@ public class CreateWalletProcessor {
         // extend the Wallet business transaction.
         GeneratedEntityIdentity identity = entityIdentityFactory.next(EntityRefType.WALLET);
         Wallet wallet = Wallet.create(identity.internalId(), identity.reference(), serviceId,
-                req.getReferenceId(), req.getAssetId(), WalletStatus.INIT, ownerType, req.getOwnerId());
+                req.getWalletBusinessRef(), req.getAssetId(), WalletStatus.INIT, ownerType,
+                req.getOwnerId());
         // Persist INIT first because the Ledger account call is external. The durable Wallet
         // reference makes that call replayable and prevents concurrent creators from issuing
         // different Ledger accounts for the same Wallet business reference.
         if (walletManager.insertIgnore(wallet) == 0) {
             // A concurrent creator may have won the business-key race. Its persisted ID is authoritative.
-            Wallet winner = walletManager.selectByReferenceId(serviceId, req.getReferenceId());
+            Wallet winner = walletManager.selectByWalletBusinessRef(
+                    serviceId, req.getWalletBusinessRef());
             if (winner != null && matchesRequest(winner, req, serviceId, ownerType)) {
                 return Result.success(winner);
             }
@@ -131,7 +139,7 @@ public class CreateWalletProcessor {
             ServiceId serviceId,
             OwnerType ownerType) {
         return wallet.getServiceId() == serviceId
-                && Objects.equals(wallet.getReferenceId(), req.getReferenceId())
+                && Objects.equals(wallet.getWalletBusinessRef(), req.getWalletBusinessRef())
                 && Objects.equals(wallet.getAssetId(), req.getAssetId())
                 && wallet.getOwnerType() == ownerType
                 && Objects.equals(wallet.getOwnerId(), req.getOwnerId());
@@ -165,7 +173,8 @@ public class CreateWalletProcessor {
     private Result<BalanceSnapshot> enableWallet(Wallet wallet, String ledgerAccountRef) {
         WalletAccountMapping mapping = WalletAccountMapping.create(wallet.getWalletRef(), ledgerAccountRef);
         BalanceSnapshot snapshot = BalanceSnapshot.create(wallet.getWalletRef(), wallet.getServiceId(),
-                wallet.getReferenceId(), wallet.getAssetId(), WalletStatus.OPEN, wallet.getOwnerType(),
+                wallet.getWalletBusinessRef(), wallet.getAssetId(), WalletStatus.OPEN,
+                wallet.getOwnerType(),
                 wallet.getOwnerId(), 0L, 0L, 0L);
 
         Result<Void> result = dbTxnExecutor.executeWithDefault(() -> {

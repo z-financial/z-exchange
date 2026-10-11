@@ -37,9 +37,12 @@ BalanceSnapshot retains its existing primary key and receives no independent ref
 entities still adopt the new names and values. Other supporting tables receive no identity redesign unless listed
 above, but references they store to covered entities still migrate.
 
-Caller-provided business references and idempotency keys remain separate and unchanged. Sharding/routing metadata,
+Caller-provided Wallet business references remain separate from generated entity references. For Wallet commands,
+`upstream_request_ref` within `initiator` is the single caller-owned idempotency identity; no separate
+`idempotency_key` is retained. Entity references include an immutable logical routing bucket, but physical shard
+topology and migration mechanics remain outside scope.
 BalanceSnapshot identity, generator-version bits, diagnostic generator decoding, and Java support above
-`Long.MAX_VALUE` are outside scope. No dual fields, dual writes, backfill, or legacy reads are required.
+`Long.MAX_VALUE` are also outside scope. No dual fields, dual writes, backfill, or legacy reads are required.
 
 ## 3. Design
 
@@ -56,17 +59,27 @@ The database contract is `BIGINT UNSIGNED`; the current generator remains limite
 A typed reference is immutable and opaque to business code, conceptually:
 
 ```text
-<TYPE>-<ENC_INTERNAL_ID>-<CHK>
+<TYPE>-<BUCKET>-<ENC_INTERNAL_ID>-<CHK>
 ```
 
-References contain no environment, bucket, partition, or physical topology. Exact type codes, encoding, checksum,
-and maximum length remain required decisions.
+`BUCKET` is a stable logical bucket, not a database or table number. Infrastructure maps it to the current physical
+partition, so moving a logical bucket does not change existing references. References contain no environment or
+physical topology. Exact type codes, bucket cardinality and width, encoding, checksum, and maximum length remain
+required decisions.
 
 ### 3.2 Persistence and boundaries
 
 Each owner row stores its primary key and typed reference with a unique constraint. A relationship to another
 covered entity stores the target reference, not its `internal_id`. Entity-specific names are required in schemas
 and service contracts; shorter names are allowed only inside an unambiguous typed model.
+
+This rule also applies to relationships inside one service. An `internal_id` is the storage key of one owner table
+and is only directly useful after the correct partition has already been selected. It does not identify the target
+entity type or provide a stable route if related tables are partitioned differently later. A typed reference carries
+both the expected entity type and the target's immutable logical bucket, remains valid when that bucket is moved to
+another physical shard, and gives persistence, caches, messages, logs, and reconciliation one relationship form.
+The larger relationship indexes are an accepted cost for avoiding a second internal-only identity model and future
+lookup or migration ambiguity.
 
 Wallet's `wallet_txn_ref` becomes the Ledger command/reference identity and Kafka partition key. Successful Ledger
 replies expose `ledger_txn_ref`. `command_id` becomes `command_ref`. Cache keys, structured logs, reconciliation,
@@ -87,8 +100,9 @@ select every eligible row without starvation.
 
 ### 3.4 Opacity and inherited behavior
 
-No diagnostic generator decoder is introduced in this phase. Business code must not decode internal IDs or use
-their fields or ordering for routing, validation, authorization, or correctness.
+No diagnostic generator decoder is introduced in this phase. Business code must not decode internal IDs or entity
+references or use their fields or ordering for routing, validation, authorization, or correctness. Only shared
+identity and routing infrastructure may validate a reference and read its type and logical bucket.
 
 Worker leasing, one generator per process, pool isolation, fail-closed ownership, clock-skew policy, sequence
 handling, lifecycle, observability, and fixed dependency/layout configuration remain governed by the integration
@@ -105,8 +119,9 @@ BalanceSnapshot and unlisted supporting tables retain their own identity model.
 ### REQ-2 — Reference boundaries
 
 APIs, messages, logs, caches, reconciliation, analytics, and persisted relationships shall use typed references and
-never expose another owner's `internal_id`. References are immutable and opaque; caller business references and
-idempotency keys remain separate.
+never expose another owner's `internal_id`. References are immutable and opaque to business code; shared routing
+infrastructure may read their logical bucket. Caller business references remain separate from generated references,
+and Wallet command replay is keyed by `(initiator, upstream_request_ref)`.
 
 ### REQ-3 — Allocation, transactions, and idempotency
 
@@ -164,8 +179,8 @@ reply reference. Cursor tests prove eventual selection of concurrently inserted 
 ### AC-5 — Uniqueness and decoding boundaries
 
 Reference tests cover every type and prove uniqueness across both service domains within one environment. Codec
-round trips recover type and internal ID, while business modules do not decode generated IDs or depend on their
-fields or ordering.
+round trips recover type, logical bucket, and internal ID, while business modules do not decode generated IDs or
+references or depend on their fields or ordering.
 
 ### AC-6 — Runtime and numeric safety
 
@@ -182,8 +197,9 @@ contain no legacy identity selection, compatibility path, or ambiguous cross-ser
 Before completion, record:
 
 1. stable type codes for every covered reference;
-2. encoding alphabet, checksum, and maximum length;
-3. controlled errors for malformed or unsupported references;
-4. Java/MyBatis mapping and range guard for `BIGINT UNSIGNED`;
-5. final outbox cursor/index DDL using `internal_id`; and
-6. the exact schema and protobuf rename matrix.
+2. logical-bucket cardinality, assignment rules, encoding width, and physical routing-map ownership;
+3. encoding alphabet, checksum, and maximum length;
+4. controlled errors for malformed or unsupported references;
+5. Java/MyBatis mapping and range guard for `BIGINT UNSIGNED`;
+6. final outbox cursor/index DDL using `internal_id`; and
+7. the exact schema and protobuf rename matrix.

@@ -190,8 +190,9 @@ public class BeforePostLedgerProcessor {
         postDbUpdateSnapshots(updateResult.getValue());
 
         // set idemp to DONE when found wallet txn
+        String idempotencyCacheKey = requestInfo.idempotencyCacheKey();
         Result<Void> markDoneResult = idempotencyClient.markIdempDone(
-                GlobalServiceId.WALLET.code, Constant.SCOPE, requestInfo.idempotenceKey,
+                GlobalServiceId.WALLET.code, Constant.SCOPE, idempotencyCacheKey,
                 String.valueOf(requestInfo.getStableHash()), requestInfo.token,
                 walletTxn.getWalletTxnRef(), idempConfig.getDoneTtl());
         if (markDoneResult.isFailed()) {
@@ -208,16 +209,18 @@ public class BeforePostLedgerProcessor {
 
     private void releaseOwnedIdempotencySafely(RequestInfo requestInfo) {
         try {
+            String idempotencyCacheKey = requestInfo.idempotencyCacheKey();
             String idempV = CommonIdempHelper.idempPendingValue(requestInfo.getStableHash(), requestInfo.token);
             Result<String> releaseResult = idempotencyClient.releaseIdempIfOwned(
-                    GlobalServiceId.WALLET.code, Constant.SCOPE, requestInfo.idempotenceKey, idempV);
+                    GlobalServiceId.WALLET.code, Constant.SCOPE, idempotencyCacheKey, idempV);
             if (releaseResult.isFailed()) {
                 log.error("release wallet idempotency failed, key={}, result={}",
-                        requestInfo.idempotenceKey, releaseResult);
+                        idempotencyCacheKey, releaseResult);
             }
         } catch (RuntimeException cleanupFailure) {
             // Cleanup is best effort and must never replace the original business failure.
-            log.error("release wallet idempotency threw, key={}", requestInfo.idempotenceKey, cleanupFailure);
+            log.error("release wallet idempotency threw, key={}",
+                    requestInfo.idempotencyCacheKey(), cleanupFailure);
         }
     }
 
@@ -228,7 +231,7 @@ public class BeforePostLedgerProcessor {
         // The generator call is deliberately outside updateDbToCreateTxn's transaction callback.
         return ObjectBuilder.createTransaction(
                 entityIdentityFactory.next(EntityRefType.WALLET_TRANSACTION), requestInfo.transactionType,
-                requestInfo.referenceId, serviceId, requestInfo.idempotenceKey, businessType);
+                requestInfo.upstreamRequestRef, serviceId, businessType);
     }
 
     private Result<Void> validateEntityReferences(List<TransactionLinePb> lines) {

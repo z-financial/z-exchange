@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -48,14 +49,15 @@ class IdempPrecheckProcessorTest {
     @Test
     void redisClaimFailureFallsBackToAuthoritativeDbCheck() {
         when(idempotencyClient.claimIdempIfAbsent(
-                anyString(), anyString(), anyString(), anyString(), anyString(), any(Duration.class)))
+                anyString(), anyString(), eq("2:upstream-request-1"),
+                anyString(), anyString(), any(Duration.class)))
                 .thenReturn(Result.failure(RedisErrorCode.CONNECTION, "redis unavailable"));
-        when(walletTransactionRepository.selectByIdempotencyKey(any(), anyString())).thenReturn(null);
+        when(walletTransactionRepository.selectByUpstreamRequestRef(any(), anyString())).thenReturn(null);
 
         Result<String> result = processor.idempAndValidatePrecheck(requestInfo());
 
         assertTrue(result.isSuccess());
-        verify(walletTransactionRepository).selectByIdempotencyKey(any(), anyString());
+        verify(walletTransactionRepository).selectByUpstreamRequestRef(any(), anyString());
     }
 
     @Test
@@ -81,20 +83,19 @@ class IdempPrecheckProcessorTest {
                 .thenReturn(Result.failure(RedisErrorCode.MALFORMED_VALUE, "malformed"));
         when(idempotencyClient.forceDeleteIdemp(anyString(), anyString(), anyString()))
                 .thenReturn(Result.success(true));
-        when(walletTransactionRepository.selectByIdempotencyKey(any(), anyString())).thenReturn(null);
+        when(walletTransactionRepository.selectByUpstreamRequestRef(any(), anyString())).thenReturn(null);
 
         Result<String> result = processor.idempAndValidatePrecheck(requestInfo());
 
         assertTrue(result.isSuccess());
         verify(idempotencyClient).forceDeleteIdemp(anyString(), anyString(), anyString());
-        verify(walletTransactionRepository).selectByIdempotencyKey(any(), anyString());
+        verify(walletTransactionRepository).selectByUpstreamRequestRef(any(), anyString());
     }
 
     private RequestInfo requestInfo() {
         return new RequestInfo(
-                "ref-1",
+                "upstream-request-1",
                 ServiceIdPb.ServiceIdPb_User,
-                "idemp-1",
                 BusinessTypePb.BusinessTypePb_Transfer,
                 TransactionType.ATOMIC,
                 List.of(),

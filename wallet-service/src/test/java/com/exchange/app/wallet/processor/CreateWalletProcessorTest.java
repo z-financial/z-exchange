@@ -36,7 +36,7 @@ class CreateWalletProcessorTest {
         String walletRef = codec.encode(EntityRefType.WALLET, 41L);
         Wallet persisted = Wallet.create(41L, walletRef, ServiceId.USER, "customer-wallet-1",
                 "USD", WalletStatus.OPEN, OwnerType.USER, "customer-1");
-        when(walletRepository.selectByReferenceId(ServiceId.USER, "customer-wallet-1"))
+        when(walletRepository.selectByWalletBusinessRef(ServiceId.USER, "customer-wallet-1"))
                 .thenReturn(persisted);
 
         CreateWalletProcessor processor = new CreateWalletProcessor(
@@ -51,7 +51,7 @@ class CreateWalletProcessorTest {
         );
         CreateWalletRequestPb request = CreateWalletRequestPb.newBuilder()
                 .setServiceId(ServiceIdPb.ServiceIdPb_User)
-                .setReferenceId("customer-wallet-1")
+                .setWalletBusinessRef("customer-wallet-1")
                 .setAssetId("USD")
                 .setOwnerType(OwnerTypePb.OwnerTypePb_User)
                 .setOwnerId("customer-1")

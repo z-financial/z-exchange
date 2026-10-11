@@ -9,9 +9,8 @@ create table wallet_transactions (
 	internal_id bigint unsigned not null primary key,
     /* Base62 references are case-sensitive; utf8mb4_bin preserves their exact spelling. */
     wallet_txn_ref char(22) character set utf8mb4 collate utf8mb4_bin not null,
-    reference_id varchar(64) not null,
+    upstream_request_ref varchar(64) not null,
     initiator tinyint not null,
-    idempotency_key varchar(64) not null,
     txn_status tinyint not null,
     txn_type tinyint not null,
     business_type tinyint not null,
@@ -19,8 +18,8 @@ create table wallet_transactions (
     created_at timestamp(3) not null,
     updated_at timestamp(3) not null,
     unique key(wallet_txn_ref),
-    unique key(initiator, idempotency_key),
-    key(reference_id)
+    /* The upstream request reference is the command-level idempotency identity. */
+    unique key uk_wallet_txn_upstream_request(initiator, upstream_request_ref)
 );
 
 drop table if exists wallet_actions;
@@ -54,11 +53,11 @@ create table wallet_reservations (
     reservation_status tinyint not null comment 'ACTIVE, FINISHED, CLOSED',
     reservation_outcome tinyint not null comment 'the resolution of asset: NOT_DONE when status=ACTIVE, CONSUMED when fully consumed, RELEASED when fully releasd, PARTIAL when partially consumed and released for the rest, CANCELLED when status=CLOSED',
     initiator tinyint not null,
-    reference_id varchar(64) not null,
+    wallet_reservation_business_ref varchar(64) not null,
     reserve_wallet_txn_ref char(22) character set utf8mb4 collate utf8mb4_bin not null,
     unique key(wallet_reservation_ref),
     key(wallet_ref),
-    unique key uk_wallet_reservation_initiator_ref(initiator, reference_id),
+    unique key uk_wallet_reservation_business_ref(initiator, wallet_reservation_business_ref),
     key(reserve_wallet_txn_ref)
 );
 
@@ -66,14 +65,14 @@ create table wallets (
 	internal_id bigint unsigned not null primary key,
     wallet_ref char(22) character set utf8mb4 collate utf8mb4_bin not null,
     service_id tinyint not null,
-    reference_id varchar(64) not null,
+    wallet_business_ref varchar(64) not null,
     asset_id varchar(64) not null,
     wallet_status tinyint not null,
     owner_type tinyint not null,
     owner_id varchar(64) not null,
     unique key(wallet_ref),
     /* One service-owned business reference identifies exactly one wallet. */
-    unique key uk_wallet_service_reference(service_id, reference_id),
+    unique key uk_wallet_service_business_ref(service_id, wallet_business_ref),
     key(owner_type, owner_id)
 );
 

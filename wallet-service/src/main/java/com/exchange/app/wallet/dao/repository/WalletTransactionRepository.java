@@ -34,16 +34,24 @@ public class WalletTransactionRepository extends DbBaseRepository<WalletTransact
         return mapper.selectOne(query);
     }
 
-    public WalletTransaction selectByIdempotencyKey(ServiceId serviceId, String idempotencyKey) {
-        return selectByIdempotencyKey(serviceId, idempotencyKey, null);
+    public WalletTransaction selectByUpstreamRequestRef(
+            ServiceId initiator,
+            String upstreamRequestRef) {
+        return selectByUpstreamRequestRef(initiator, upstreamRequestRef, null);
     }
 
-    public WalletTransaction selectByIdempotencyKey(ServiceId serviceId, String idempotencyKey, LambdaQueryWrapper<WalletTransaction> queryWrapper) {
-        if (serviceId == null || Strings.isEmpty(idempotencyKey)) {
-            throw WalletExceptionFactory.invalidValue(String.format("serviceId or idempotencyKey is null, serviceId:%s, idempotencyKey:%s", serviceId, idempotencyKey));
+    public WalletTransaction selectByUpstreamRequestRef(
+            ServiceId initiator,
+            String upstreamRequestRef,
+            LambdaQueryWrapper<WalletTransaction> queryWrapper) {
+        if (initiator == null || Strings.isEmpty(upstreamRequestRef)) {
+            throw WalletExceptionFactory.invalidValue(String.format(
+                    "initiator or upstreamRequestRef is null, initiator:%s, upstreamRequestRef:%s",
+                    initiator, upstreamRequestRef));
         }
         LambdaQueryWrapper<WalletTransaction> query = Objects.requireNonNullElseGet(queryWrapper, LambdaQueryWrapper::new);
-        query = query.eq(WalletTransaction::getInitiator, serviceId).eq(WalletTransaction::getIdempotencyKey, idempotencyKey);
+        query = query.eq(WalletTransaction::getInitiator, initiator)
+                .eq(WalletTransaction::getUpstreamRequestRef, upstreamRequestRef);
         return mapper.selectOne(query);
     }
 

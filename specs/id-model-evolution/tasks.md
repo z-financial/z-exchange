@@ -10,11 +10,12 @@ Implement the shared typed-reference codec and generated internal-ID persistence
 
 Done when:
 
-- Stable type codes, encoding, checksum, maximum length, and validation errors are defined.
-- The codec creates and parses `<TYPE>-<ENC_INTERNAL_ID>-<CHK>` references locally and deterministically.
+- Stable type codes, logical-bucket rules, encoding, checksum, maximum length, and validation errors are defined.
+- The codec creates and parses `<TYPE>-<BUCKET>-<ENC_INTERNAL_ID>-<CHK>` references locally and deterministically.
 - Covered persistence models support generated `internal_id BIGINT UNSIGNED` values in `1..Long.MAX_VALUE`.
 - MyBatis round-trips `1`, representative values, and `Long.MAX_VALUE` without sign or precision changes.
-- Production business logic does not decode generated IDs or depend on their fields or ordering.
+- Production business logic does not decode generated IDs or references; shared routing infrastructure alone reads
+  the logical bucket and maps it to a physical partition.
 
 ## Task 2 — Migrate Wallet identities
 
@@ -26,7 +27,8 @@ Done when:
 
 - Wallet, transaction, reservation, and action rows use generated `internal_id` primary keys and unique typed refs.
 - Legacy owner `id` and generated business-ID columns are removed.
-- APIs, protobufs, caches, logs, and relationships use the appropriate Wallet reference.
+- APIs, protobufs, caches, logs, and relationships—including relationships within Wallet—use the appropriate typed
+  reference rather than another owner's `internal_id`.
 - BalanceSnapshot keeps its current identity, while references to migrated Wallet entities use typed refs.
 - Creation and accepted idempotent replay preserve the original references atomically.
 
@@ -69,6 +71,6 @@ Done when:
 
 - Allocation, encoding, duplicate, and ownership failures roll back the complete transaction with no fallback ID.
 - Duplicate internal IDs or references produce a high-severity operational signal.
-- Malformed, unknown-type, and checksum-invalid references return controlled errors.
+- Malformed, unknown-type, out-of-range-bucket, and checksum-invalid references return controlled errors.
 - Existing lease, restart, multi-instance, clock-skew, resource-isolation, and shutdown tests continue to pass.
 - Builds and tests pass with no legacy identity path, dual write, backfill, or ambiguous cross-service ID remaining.

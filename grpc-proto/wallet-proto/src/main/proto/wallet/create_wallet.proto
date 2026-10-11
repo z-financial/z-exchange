@@ -10,7 +10,7 @@ import "com/exchange/proto/common/error.proto";
 
 message CreateWalletRequestPb {
   ServiceIdPb service_id = 1;
-  string reference_id = 2;
+  string wallet_business_ref = 2;
   string asset_id = 3;
   OwnerTypePb owner_type = 4;
   string owner_id = 5;

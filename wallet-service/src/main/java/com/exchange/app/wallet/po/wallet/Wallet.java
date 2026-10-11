@@ -21,14 +21,15 @@ public class Wallet {
     private Long internalId;
     private String walletRef;
     private ServiceId serviceId;
-    private String referenceId;
+    private String walletBusinessRef;
     private String assetId;
     private WalletStatus walletStatus;
     private OwnerType ownerType;
     private String ownerId;
 
-    public static Wallet create(Long internalId, String walletRef, ServiceId serviceId, String referenceId,
+    public static Wallet create(Long internalId, String walletRef, ServiceId serviceId, String walletBusinessRef,
                                 String assetId, WalletStatus walletStatus, OwnerType ownerType, String ownerId) {
-        return new Wallet(internalId, walletRef, serviceId, referenceId, assetId, walletStatus, ownerType, ownerId);
+        return new Wallet(internalId, walletRef, serviceId, walletBusinessRef,
+                assetId, walletStatus, ownerType, ownerId);
     }
 }

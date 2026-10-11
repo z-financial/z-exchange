@@ -40,7 +40,10 @@ public class ReserveTransactionProcessor {
         }
 
         String token = TokenHelper.generateToken(GlobalServiceId.LEDGER.name());
-        RequestInfo requestInfo = new RequestInfo(request.getReferenceId(), request.getInitiator(), request.getIdempotencyKey(), request.getBusinessType(), TransactionType.TWO_STEP, request.getLinesList(), ReserveTransactionRequestPb.getDescriptor().getName(), token);
+        RequestInfo requestInfo = new RequestInfo(
+                request.getUpstreamRequestRef(), request.getInitiator(), request.getBusinessType(),
+                TransactionType.TWO_STEP, request.getLinesList(),
+                ReserveTransactionRequestPb.getDescriptor().getName(), token);
         Result<String> idempResult = idempPrecheckProcessor.idempAndValidatePrecheck(requestInfo);
         if (idempResult.isFailed()) {
             return replyError(idempResult);

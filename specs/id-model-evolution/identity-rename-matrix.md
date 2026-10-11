@@ -45,6 +45,10 @@ not generate or reinterpret the value.
 | `wallet_actions.reservation_id` | `wallet_reservation_ref` | optional generated reservation reference |
 | `wallet_reservations.wallet_id` | `wallet_ref` | generated Wallet reference |
 | `wallet_reservations.reserve_txn_id` | `reserve_wallet_txn_ref` | generated Wallet transaction reference |
+| `wallets.reference_id` | `wallet_business_ref` | caller-owned Wallet business reference |
+| `wallet_transactions.reference_id` | `upstream_request_ref` | caller-owned command-level request reference |
+| `wallet_transactions.idempotency_key` | removed | `upstream_request_ref` is the idempotency key within `initiator` |
+| `wallet_reservations.reference_id` | `wallet_reservation_business_ref` | derived reservation business reference |
 | `balance_snapshots.wallet_id` | `wallet_ref` | generated Wallet reference; snapshot PK remains `id` |
 | `balance_snapshots.wallet_reference_id` | `wallet_business_ref` | caller-owned Wallet business reference |
 | `balance_snapshots.last_txn_id` | `last_wallet_txn_ref` | generated Wallet transaction reference |
@@ -58,10 +62,7 @@ not generate or reinterpret the value.
 
 The following fields remain caller data with unchanged meaning:
 
-- `wallets.reference_id`;
-- `wallet_transactions.reference_id`;
-- `wallet_reservations.reference_id`;
-- all `idempotency_key`, `owner_id`, and `asset_id` fields.
+- all `owner_id` and `asset_id` fields.
 
 ## 3. Common event protobuf
 
@@ -76,14 +77,14 @@ No protobuf field carries an outbox `internal_id`.
 
 | Message | Field number | Current field | Target field | Meaning |
 | --- | ---: | --- | --- | --- |
-| `CreateWalletRequestPb` | 2 | `reference_id` | unchanged | caller business reference |
+| `CreateWalletRequestPb` | 2 | `reference_id` | `wallet_business_ref` | caller business reference |
 | `CreateWalletReplyPb` | 2 (new) | — | `wallet_ref` | created or replayed Wallet reference |
 | `AtomicTransactionReplyPb` | 2 | `transaction_id` | `wallet_txn_ref` | Wallet transaction reference |
 | `ReserveTransactionReplyPb` | 2 | `transaction_id` | `wallet_txn_ref` | Wallet transaction reference |
 | `TwoStepTransactionReplyPb` | 2 | `transaction_id` | `wallet_txn_ref` | Wallet transaction reference |
 | `ApplyReservationTransactionReplyPb` | 2 | `transaction_id` | `wallet_txn_ref` | Wallet transaction reference |
-| transaction request messages | 1 | `reference_id` | unchanged | caller business reference |
-| transaction request messages | 3 | `idempotency_key` | unchanged | caller idempotency key |
+| transaction request messages | 1 | `reference_id` | `upstream_request_ref` | command-level caller reference and idempotency key within `initiator` |
+| transaction request messages | 3 | `idempotency_key` | removed | duplicate caller identity is unnecessary before launch |
 | `TransactionLinePb` | 1 | `wallet_ref` | unchanged name, typed semantics | Wallet reference |
 | `TransactionLinePb` | 5 | `reservation_ref` | unchanged name, typed semantics | reservation reference |
 | `ReservationInfoPb` | 1 | `reservation_ref` | unchanged name, typed semantics | reservation reference |

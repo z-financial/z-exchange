@@ -172,13 +172,20 @@ cannot silently route an otherwise valid identifier to the wrong partition.
 
 ### 2.5 Caller-owned references and idempotency
 
-Caller-provided business references and idempotency keys are not entity
-identity and remain separate. A field currently named `reference_id` must be
-classified before renaming:
+Caller-provided business references are not generated entity identity. A field
+currently named `reference_id` must be classified before renaming:
 
-- caller-provided references remain caller-owned request data; and
+- Wallet creation uses `wallet_business_ref` within `service_id`;
+- Wallet commands use `upstream_request_ref` within `initiator` as their single
+  caller-owned idempotency identity; and
 - fields that actually identify another covered entity become that entity's
   typed `*_ref`.
+
+Wallet command requests and `wallet_transactions` contain no separate
+`idempotency_key`. Redis and MySQL use the same
+`(initiator, upstream_request_ref)` identity. Persisting a canonical request
+hash for durable same-key/different-payload detection remains a follow-up TODO
+and is not added in this phase.
 
 No caller reference may be silently reinterpreted as a generated typed
 reference.
