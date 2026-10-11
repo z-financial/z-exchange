@@ -10,7 +10,9 @@ import com.exchange.common.exception.CustomizedException;
 import com.exchange.common.exception.DbException;
 import com.exchange.common.kafka.listener.exception.KafkaListenerRetriableException;
 import com.exchange.common.identity.DefaultEntityRefCodec;
+import com.exchange.common.identity.DefaultEventRefFactory;
 import com.exchange.common.identity.EntityRefType;
+import com.exchange.common.identity.EventRefType;
 import com.exchange.common.result.Result;
 import com.exchange.common.result.error.DbErrorCode;
 import com.exchange.proto.common.error.ErrorCodePb;
@@ -38,6 +40,8 @@ class WalletLedgerReplyMessageHandlerTest {
             .encode(EntityRefType.WALLET_TRANSACTION, 1L);
     private static final String LEDGER_TXN_REF = new DefaultEntityRefCodec()
             .encode(EntityRefType.LEDGER_TRANSACTION, 2L);
+    private static final DefaultEventRefFactory EVENT_REF_FACTORY = new DefaultEventRefFactory();
+    private static final String REPLY_EVENT_REF = EVENT_REF_FACTORY.create(EventRefType.LEDGER_REPLY, 3L);
 
     @Mock
     private AfterPostLedgerProcessor afterPostLedgerProcessor;
@@ -51,7 +55,8 @@ class WalletLedgerReplyMessageHandlerTest {
         handler = new WalletLedgerReplyMessageHandler(
                 afterPostLedgerProcessor,
                 new WalletBusinessMetrics(meterRegistry),
-                new DefaultEntityRefCodec()
+                new DefaultEntityRefCodec(),
+                EVENT_REF_FACTORY
         );
     }
 
@@ -96,8 +101,8 @@ class WalletLedgerReplyMessageHandlerTest {
     @Test
     void unsupportedEventTypeIsNonRetryableProtocolFailure() {
         EventEnvelopePb envelope = EventEnvelopePb.newBuilder()
-                .setEventId("reply-event-1")
-                .setCommandId(WALLET_TXN_REF)
+                .setEventRef(REPLY_EVENT_REF)
+                .setCommandRef(WALLET_TXN_REF)
                 .setEventType("UNKNOWN")
                 .setPayload(successReply().toByteString())
                 .build();
@@ -141,8 +146,8 @@ class WalletLedgerReplyMessageHandlerTest {
 
     private EventEnvelopePb envelope(ByteString payload) {
         return EventEnvelopePb.newBuilder()
-                .setEventId("reply-event-1")
-                .setCommandId(WALLET_TXN_REF)
+                .setEventRef(REPLY_EVENT_REF)
+                .setCommandRef(WALLET_TXN_REF)
                 .setEventType(EventType.POST_LEDGER_REPLY)
                 .setPayload(payload)
                 .build();

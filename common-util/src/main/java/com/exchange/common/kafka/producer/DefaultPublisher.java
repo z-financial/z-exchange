@@ -71,8 +71,8 @@ public class DefaultPublisher implements IPublisher {
             }
 
             byte[] envelopeBytes = EventEnvelopePb.newBuilder()
-                    .setEventId(outbox.getEventId())
-                    .setCommandId(outbox.getCommandId())
+                    .setEventRef(outbox.getEventRef())
+                    .setCommandRef(outbox.getCommandRef())
                     .setEventType(eventType)
                     .setPayload(ByteString.copyFrom(outbox.getPayload()))
                     .setOccurredAt(LongTimeHelper.now())
@@ -106,23 +106,23 @@ public class DefaultPublisher implements IPublisher {
         Throwable cause = unwrap(throwable);
         if (cause instanceof TimeoutException) {
             log.error(
-                    "publish event timed out after {} ms, eventId={}, commandId={}, destination={}",
+                    "publish event timed out after {} ms, eventRef={}, commandRef={}, destination={}",
                     timeoutMillis,
-                    outbox.getEventId(),
-                    outbox.getCommandId(),
+                    outbox.getEventRef(),
+                    outbox.getCommandRef(),
                     outbox.getDestination(),
                     cause
             );
         } else {
             log.error(
-                    "publish event failed, eventId={}, commandId={}, destination={}",
-                    outbox.getEventId(),
-                    outbox.getCommandId(),
+                    "publish event failed, eventRef={}, commandRef={}, destination={}",
+                    outbox.getEventRef(),
+                    outbox.getCommandRef(),
                     outbox.getDestination(),
                     cause
             );
         }
-        return Result.failure(KafkaProducerErrorCode.PUBLISH_FAILED, outbox.getCommandId());
+        return Result.failure(KafkaProducerErrorCode.PUBLISH_FAILED, outbox.getCommandRef());
     }
 
     private Throwable unwrap(Throwable throwable) {

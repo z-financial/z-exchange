@@ -110,7 +110,7 @@ class OutboxRepositoryTest {
                 outbox -> outbox.setDestination("other-topic"),
                 outbox -> outbox.setPartitionKey("other-key"),
                 outbox -> outbox.setEventType(2),
-                outbox -> outbox.setCommandId("other-command")
+                outbox -> outbox.setCommandRef("other-command")
         );
 
         for (Consumer<Outbox> mutation : mutations) {
@@ -157,8 +157,8 @@ class OutboxRepositoryTest {
         assertTrue(sql.contains("next_attempt_at <="));
         assertTrue(sql.contains("next_attempt_at >"));
         assertTrue(sql.contains("next_attempt_at ="));
-        assertTrue(sql.contains("id >"));
-        assertTrue(sql.contains("order by next_attempt_at asc,id asc"));
+        assertTrue(sql.contains("internal_id >"));
+        assertTrue(sql.contains("order by next_attempt_at asc,internal_id asc"));
         assertTrue(sql.contains("for update skip locked"));
     }
 
@@ -168,9 +168,10 @@ class OutboxRepositoryTest {
 
     private Outbox outbox() {
         return Outbox.create(
+                1L,
                 1,
-                "reply:wallet-event-123:success",
-                "wallet-command-123",
+                "ledger-reply-event-ref",
+                "wallet-transaction-ref",
                 OutboxStatus.PENDING,
                 "ledger.wallet.reply.posting",
                 "wallet-command-123",

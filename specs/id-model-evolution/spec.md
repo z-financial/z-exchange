@@ -91,8 +91,10 @@ An outbox row uses generated `internal_id` as primary key and unique `event_ref`
 request receives one `event_ref`, committed atomically with Wallet state and reused for immediate publication and
 every retry.
 
-A Ledger reply `event_ref` remains deterministic from the request `event_ref` and outcome. Redelivery reconstructs
-the same value for same-intent deduplication; the reference need not encode the reply row's `internal_id`.
+Each newly persisted Ledger reply receives its own generated `internal_id` and corresponding `LER` `event_ref`.
+Publishing retries reuse the reference stored on that outbox row. Reprocessing one request may create another reply
+event, while the unchanged `command_ref` correlates every reply to the Wallet transaction and Wallet's guarded state
+transition prevents duplicate business effects.
 
 Retry scanning uses `(next_attempt_at, internal_id)` as cursor and index order. Non-strict insertion ordering may
 defer a concurrent eligible row by one retry cycle. This latency is accepted, but repeated cycles must eventually
@@ -131,9 +133,10 @@ mutation, completed idempotency result, or orphaned outbox row; unused IDs are a
 
 ### REQ-4 — Event identity and delivery
 
-Request `event_ref` values are allocated once and reused for every publication. Reply references remain
-deterministic for the same request and outcome. Database uniqueness is authoritative, publishers never replace
-stored references, and polling eventually selects rows despite accepted single-cycle deferral.
+Each request or reply outbox row receives one `event_ref`, which is reused for every publication attempt of that
+row. Reprocessing a Ledger command may persist multiple uniquely identified replies with the same `command_ref`.
+Database uniqueness is authoritative, publishers never replace stored references, and polling eventually selects
+rows despite accepted single-cycle deferral.
 
 ### REQ-5 — Runtime safety and numeric compatibility
 
@@ -173,8 +176,9 @@ allocation, encoding, and duplicate failures roll back fully without completing 
 
 ### AC-4 — Event and retry stability
 
-Wallet publication and retries reuse the stored request `event_ref`; repeated Ledger outcomes reconstruct the same
-reply reference. Cursor tests prove eventual selection of concurrently inserted eligible rows without starvation.
+Wallet and Ledger publication retries reuse each row's stored `event_ref`; distinct Ledger reply rows receive
+distinct references while retaining the Wallet transaction `command_ref`. Cursor tests prove eventual selection of
+concurrently inserted eligible rows without starvation.
 
 ### AC-5 — Uniqueness and decoding boundaries
 

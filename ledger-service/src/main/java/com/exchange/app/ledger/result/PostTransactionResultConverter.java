@@ -22,8 +22,8 @@ public final class PostTransactionResultConverter {
         }
 
         if (result.isSuccess()) {
-            // Creation and idempotent replay are the same wire outcome. Keep the payload
-            // canonical so a redelivery matches the already-persisted deterministic reply.
+            // Creation and idempotent replay are the same wire outcome. Diagnostic differences
+            // must not leak into the public success contract consumed by Wallet.
             builder.setError(PbErrorBuilder.success());
         } else {
             builder.setError(PbErrorBuilder.build(result.errorCode(), result.detail()));

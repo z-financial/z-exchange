@@ -40,6 +40,7 @@ class DefaultPublisherTest {
     @BeforeEach
     void setUp() {
         outbox = Outbox.create(
+                1L,
                 1,
                 "event-1",
                 "command-1",
@@ -71,8 +72,8 @@ class DefaultPublisherTest {
         var envelopeCaptor = org.mockito.ArgumentCaptor.forClass(byte[].class);
         verify(kafkaTemplate).send(eq("destination-1"), eq("partition-key-1"), envelopeCaptor.capture());
         EventEnvelopePb envelope = EventEnvelopePb.parseFrom(envelopeCaptor.getValue());
-        assertEquals("event-1", envelope.getEventId());
-        assertEquals("command-1", envelope.getCommandId());
+        assertEquals("event-1", envelope.getEventRef());
+        assertEquals("command-1", envelope.getCommandRef());
         assertEquals("event-name-1", envelope.getEventType());
         assertArrayEquals(outbox.getPayload(), envelope.getPayload().toByteArray());
     }

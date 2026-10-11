@@ -23,7 +23,7 @@ class MessageHandlerAdapterTest {
     @Test
     void outboxReplyHandlerWrapsDelegateOutbox() {
         // KL-MH-001: request/reply handlers expose successful work as an OutboxReply action.
-        Outbox outbox = outbox("reply:event:success");
+        Outbox outbox = outbox("ledger-reply-event-ref");
         var handler = new OutboxReplyDefaultMessageHandler(envelope -> outbox, failureFactory(outbox));
 
         ListenerAction action = handler.handle(envelope());
@@ -35,7 +35,7 @@ class MessageHandlerAdapterTest {
     @Test
     void outboxReplyHandlerUsesFailureReplyFactory() {
         // KL-MH-002: parseable failures are delegated to the service-owned failure reply factory.
-        Outbox failedOutbox = outbox("reply:event:error:kafka:retry_exhausted");
+        Outbox failedOutbox = outbox("ledger-retry-exhausted-event-ref");
         var handler = new OutboxReplyDefaultMessageHandler(envelope -> outbox("unused"), failureFactory(failedOutbox));
         ListenerFailure failure = ListenerFailure.retryExhausted(KafkaListenerErrorCode.RETRY_EXHAUSTED, "exhausted");
 
@@ -81,21 +81,22 @@ class MessageHandlerAdapterTest {
 
     private EventEnvelopePb envelope() {
         return EventEnvelopePb.newBuilder()
-                .setEventId("event")
-                .setCommandId("command")
+                .setEventRef("event")
+                .setCommandRef("command")
                 .setEventType("POST_LEDGER")
                 .build();
     }
 
-    private Outbox outbox(String eventId) {
+    private Outbox outbox(String eventRef) {
         return Outbox.create(
+                1L,
                 1,
-                eventId,
+                eventRef,
                 "command",
                 OutboxStatus.PENDING,
                 "topic",
                 "command",
-                eventId.getBytes(),
+                eventRef.getBytes(),
                 0,
                 LocalDateTime.now(),
                 LocalDateTime.now(),

@@ -218,8 +218,8 @@ public class DefaultListener {
     }
 
     /*
-     * If the outer envelope cannot be parsed, the listener cannot know the event id,
-     * command id, or reply contract. There is no safe failure reply to create, so this is
+     * If the outer envelope cannot be parsed, the listener cannot know the event reference,
+     * command reference, or reply contract. There is no safe failure reply to create, so this is
      * routed to DLQ instead of being downgraded into a business failure.
      */
     private EventEnvelopePb parseEnvelopeOrThrowDlq(byte[] envelopeBytes) {
@@ -236,7 +236,7 @@ public class DefaultListener {
 
     /*
      * Retryable failures remain Kafka retries until the reply threshold. After that
-     * threshold, a deterministic retry-exhausted reply is persisted so the upstream is not
+     * threshold, a durable retry-exhausted reply is persisted so the upstream is not
      * left waiting forever. If that durable reply still cannot be produced, this method
      * rethrows and lets Spring RetryableTopic own the final DLT routing.
      */
@@ -299,11 +299,11 @@ public class DefaultListener {
                 case EXISTING_SAME_INTENT -> decision.existing();
                 case EXISTING_MISSING_AMBIGUOUS -> throw new KafkaListenerRetriableException(
                         KafkaListenerErrorCode.REPLY_OUTBOX_AMBIGUOUS,
-                        "reply outbox insert affected 0 rows but existing row is missing, eventId=" + outbox.getEventId()
+                        "reply outbox insert affected 0 rows but existing row is missing, eventRef=" + outbox.getEventRef()
                 );
                 case EXISTING_CONFLICT -> throw new DlqException(
                         KafkaListenerErrorCode.REPLY_OUTBOX_CONFLICT,
-                        "reply outbox event id conflicts with different intent, eventId=" + outbox.getEventId()
+                        "reply outbox event reference conflicts with different intent, eventRef=" + outbox.getEventRef()
                 );
             };
         } catch (KafkaListenerRetriableException | DlqException e) {
@@ -368,8 +368,8 @@ public class DefaultListener {
         }
         if (outbox.getOutboxStatus() != OutboxStatus.PENDING) {
             log.info(
-                    "skip immediate publish for non-pending outbox, eventId={}, status={}",
-                    outbox.getEventId(),
+                    "skip immediate publish for non-pending outbox, eventRef={}, status={}",
+                    outbox.getEventRef(),
                     outbox.getOutboxStatus()
             );
             return;
@@ -379,9 +379,9 @@ public class DefaultListener {
             CompletableFuture<Result<Void>> publishFuture = replyPublisher.publishAsync(outbox);
             if (publishFuture == null) {
                 log.error(
-                        "immediate reply publish returned null future, eventId={}, commandId={}",
-                        outbox.getEventId(),
-                        outbox.getCommandId()
+                        "immediate reply publish returned null future, eventRef={}, commandRef={}",
+                        outbox.getEventRef(),
+                        outbox.getCommandRef()
                 );
                 return;
             }
@@ -390,18 +390,18 @@ public class DefaultListener {
                     publishCallbackExecutor
             ).exceptionally(throwable -> {
                 log.error(
-                        "immediate reply publish callback failed, eventId={}, commandId={}",
-                        outbox.getEventId(),
-                        outbox.getCommandId(),
+                        "immediate reply publish callback failed, eventRef={}, commandRef={}",
+                        outbox.getEventRef(),
+                        outbox.getCommandRef(),
                         throwable
                 );
                 return null;
             });
         } catch (Exception e) {
             log.error(
-                    "immediate reply publish setup threw exception, eventId={}, commandId={}",
-                    outbox.getEventId(),
-                    outbox.getCommandId(),
+                    "immediate reply publish setup threw exception, eventRef={}, commandRef={}",
+                    outbox.getEventRef(),
+                    outbox.getCommandRef(),
                     e
             );
         }
@@ -410,18 +410,18 @@ public class DefaultListener {
     private void handleImmediatePublishCompletion(Outbox outbox, Result<Void> result, Throwable throwable) {
         if (throwable != null) {
             log.error(
-                    "immediate reply publish completed exceptionally, eventId={}, commandId={}",
-                    outbox.getEventId(),
-                    outbox.getCommandId(),
+                    "immediate reply publish completed exceptionally, eventRef={}, commandRef={}",
+                    outbox.getEventRef(),
+                    outbox.getCommandRef(),
                     throwable
             );
             return;
         }
         if (result == null) {
             log.error(
-                    "immediate reply publish completed with null result, eventId={}, commandId={}",
-                    outbox.getEventId(),
-                    outbox.getCommandId()
+                    "immediate reply publish completed with null result, eventRef={}, commandRef={}",
+                    outbox.getEventRef(),
+                    outbox.getCommandRef()
             );
             return;
         }
@@ -430,9 +430,9 @@ public class DefaultListener {
             return;
         }
         log.error(
-                "immediate reply publish failed, eventId={}, commandId={}, errorCode={}, detail={}",
-                outbox.getEventId(),
-                outbox.getCommandId(),
+                "immediate reply publish failed, eventRef={}, commandRef={}, errorCode={}, detail={}",
+                outbox.getEventRef(),
+                outbox.getCommandRef(),
                 result.getErrorCode(),
                 result.getDetail()
         );
@@ -442,10 +442,10 @@ public class DefaultListener {
         try {
             int updated = outboxRepository.updateStatusToFinalize(outbox, OutboxStatus.SENT, LocalDateTime.now());
             if (updated != 1) {
-                log.error("finalize reply outbox failed, eventId={}, updated={}", outbox.getEventId(), updated);
+                log.error("finalize reply outbox failed, eventRef={}, updated={}", outbox.getEventRef(), updated);
             }
         } catch (Exception e) {
-            log.error("finalize reply outbox threw exception, eventId={}", outbox.getEventId(), e);
+            log.error("finalize reply outbox threw exception, eventRef={}", outbox.getEventRef(), e);
         }
     }
 }

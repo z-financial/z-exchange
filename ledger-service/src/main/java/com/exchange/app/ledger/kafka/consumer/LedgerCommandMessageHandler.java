@@ -10,6 +10,9 @@ import com.exchange.app.ledger.utils.OutboxHelper;
 import com.exchange.common.exception.AbnormalProtoDataException;
 import com.exchange.common.exception.CustomizedException;
 import com.exchange.common.exception.IdGeneratorException;
+import com.exchange.common.identity.EventRefFactory;
+import com.exchange.common.identity.EventRefType;
+import com.exchange.common.idgen.InternalIdGenerator;
 import com.exchange.common.kafka.listener.exception.KafkaListenerRetriableException;
 import com.exchange.common.outbox.po.Outbox;
 import com.exchange.proto.common.event.EventEnvelopePb;
@@ -27,13 +30,22 @@ import java.util.function.Function;
 public class LedgerCommandMessageHandler implements Function<EventEnvelopePb, Outbox> {
     private final PostLedgerProcessor postLedgerProcessor;
     private final LedgerBusinessMetrics ledgerBusinessMetrics;
+    private final InternalIdGenerator internalIdGenerator;
+    private final EventRefFactory eventRefFactory;
 
     @Override
     public Outbox apply(EventEnvelopePb envelope) {
+        var eventRefValidation = eventRefFactory.validate(
+                envelope.getEventRef(), EventRefType.WALLET_REQUEST);
+        if (eventRefValidation.isFailed()) {
+            throw new AbnormalProtoDataException(
+                    LedgerServiceErrorCode.INVALID_REQUEST_PARAMETER,
+                    eventRefValidation.getDetail());
+        }
         log.info(
-                "handle ledger command, eventId={}, commandId={}, eventType={}",
-                envelope.getEventId(),
-                envelope.getCommandId(),
+                "handle ledger command, eventRef={}, commandRef={}, eventType={}",
+                envelope.getEventRef(),
+                envelope.getCommandRef(),
                 envelope.getEventType()
         );
         return switch (envelope.getEventType()) {
@@ -47,6 +59,11 @@ public class LedgerCommandMessageHandler implements Function<EventEnvelopePb, Ou
 
     private Outbox handlePostLedger(EventEnvelopePb envelope) {
         PostTransactionRequestPb request = parsePostLedgerRequest(envelope);
+        if (!envelope.getCommandRef().equals(request.getSourceTxnRef())) {
+            throw new AbnormalProtoDataException(
+                    LedgerServiceErrorCode.INVALID_REQUEST_PARAMETER,
+                    "command_ref does not match source_txn_ref");
+        }
         PostTransactionResult result;
         try {
             result = ledgerBusinessMetrics.recordPostTransaction(
@@ -61,7 +78,24 @@ public class LedgerCommandMessageHandler implements Function<EventEnvelopePb, Ou
         if (!result.isSuccess()) {
             handlePostLedgerFailure(result);
         }
-        return OutboxHelper.fromPostTransactionResult(result, envelope.getEventId(), envelope.getCommandId());
+        // One generated identity represents one durable reply event. Publisher retries reuse
+        // this stored row; reprocessing the command may intentionally create another reply event.
+        long outboxInternalId = nextOutboxInternalId();
+        return OutboxHelper.fromPostTransactionResult(
+                outboxInternalId,
+                result,
+                envelope.getCommandRef(),
+                eventRefFactory);
+    }
+
+    private long nextOutboxInternalId() {
+        try {
+            return internalIdGenerator.nextId();
+        } catch (IdGeneratorException failure) {
+            // No reply can be durable without its storage identity; retain the request for retry.
+            throw new KafkaListenerRetriableException(
+                    failure.getErrorCode(), "ledger reply outbox ID allocation is unavailable", failure);
+        }
     }
 
     /*

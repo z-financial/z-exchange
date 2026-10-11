@@ -56,7 +56,8 @@ Done when:
 
 - Wallet and Ledger outbox rows use generated `internal_id` primary keys and unique `event_ref` values.
 - A Wallet request `event_ref` is committed with business state and reused for immediate publication and retries.
-- Ledger reply references are deterministic for the same request and outcome.
+- Each newly persisted Ledger reply has a unique generated `event_ref`; retries of that row reuse it, while
+  additional replies for the same command retain the same `command_ref`.
 - Kafka partitioning uses `wallet_txn_ref`; cross-service messages expose no internal IDs.
 - Polling by `(next_attempt_at, internal_id)` eventually selects concurrently inserted eligible rows without starvation.
 

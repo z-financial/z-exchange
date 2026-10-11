@@ -46,6 +46,7 @@ class MeteredPublisherTest {
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         publisher = new MeteredPublisher(delegate, ignored -> "ledger_post", registry, clock);
         outbox = Outbox.create(
+                1L,
                 1,
                 "event-1",
                 "command-1",

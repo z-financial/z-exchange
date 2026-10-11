@@ -22,14 +22,10 @@ become generated entity references.
 | Ledger `outbox` | `id` | `internal_id` | `event_id` | `event_ref` |
 
 Every target `internal_id` is `BIGINT UNSIGNED NOT NULL PRIMARY KEY`, assigned
-by the application and constrained to `1..Long.MAX_VALUE`. Every entity typed
-reference uses `CHAR(ENTITY_REF_LENGTH) CHARACTER SET utf8mb4 COLLATE
-utf8mb4_bin NOT NULL UNIQUE`, where `ENTITY_REF_LENGTH` is `23 + BUCKET_WIDTH`.
+by the application and constrained to `1..Long.MAX_VALUE`. Every typed
+reference uses `VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`.
 The explicit binary collation preserves the case-sensitive Base62 contract
-instead of inheriting a potentially case-insensitive table collation. The
-logical-bucket width and resulting concrete column length must be finalized
-before schema implementation. Event-reference length belongs to the separate
-event contract and is not assumed to equal the entity-reference length.
+instead of inheriting a potentially case-insensitive table collation.
 
 Covered Java persistence models use `Long internalId` annotated with
 `@TableId(value = "internal_id", type = IdType.INPUT)`. Entity construction
@@ -73,6 +69,11 @@ The following fields remain caller data with unchanged meaning:
 | `EventEnvelopePb` | 2 | `command_id` | `command_ref` |
 
 No protobuf field carries an outbox `internal_id`.
+
+Wallet request event references use `WER-<11 Base62 characters>-<6 character
+checksum>`. Ledger reply references use the equivalent `LER` format. Each
+token encodes its owning outbox row's generated `internal_id`; both fit the
+`VARCHAR(32)` boundary.
 
 ## 4. Wallet protobuf
 

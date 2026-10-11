@@ -83,8 +83,8 @@ public class MeteredPublisher implements IPublisher {
             });
         } catch (RuntimeException e) {
             log.error(
-                    "failed to attach Kafka publisher metric callback, eventId={}, destination={}, source={}",
-                    outbox.getEventId(),
+                    "failed to attach Kafka publisher metric callback, eventRef={}, destination={}, source={}",
+                    outbox.getEventRef(),
                     outbox.getDestination(),
                     source.metricValue(),
                     e
@@ -115,8 +115,8 @@ public class MeteredPublisher implements IPublisher {
             }
         } catch (RuntimeException e) {
             log.error(
-                    "failed to record Kafka publisher metric, eventId={}, destination={}, source={}, outcome={}",
-                    outbox.getEventId(),
+                    "failed to record Kafka publisher metric, eventRef={}, destination={}, source={}, outcome={}",
+                    outbox.getEventRef(),
                     outbox.getDestination(),
                     source.metricValue(),
                     outcome,
@@ -131,8 +131,8 @@ public class MeteredPublisher implements IPublisher {
             return MetricTagSanitizer.safeValue(eventTypeResolver.resolve(outbox.getEventType()));
         } catch (RuntimeException e) {
             log.error(
-                    "failed to resolve Kafka publisher event type metric tag, eventId={}, eventType={}",
-                    outbox.getEventId(),
+                    "failed to resolve Kafka publisher event type metric tag, eventRef={}, eventType={}",
+                    outbox.getEventRef(),
                     outbox.getEventType(),
                     e
             );

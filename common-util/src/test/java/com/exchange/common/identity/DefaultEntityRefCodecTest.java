@@ -55,10 +55,10 @@ class DefaultEntityRefCodecTest {
     @Test
     void everyValueUsesTheFixedReferenceLength() {
         assertEquals(
-                DefaultEntityRefCodec.REFERENCE_LENGTH,
+                ReferenceFormatSupport.REFERENCE_LENGTH,
                 codec.encode(EntityRefType.WALLET, 1).length());
         assertEquals(
-                DefaultEntityRefCodec.REFERENCE_LENGTH,
+                ReferenceFormatSupport.REFERENCE_LENGTH,
                 codec.encode(EntityRefType.LEDGER_ENTRY, Long.MAX_VALUE).length());
     }
 

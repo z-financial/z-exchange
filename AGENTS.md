@@ -85,3 +85,9 @@
 - Do NOT remove Redis idempotency layer (DB-only is insufficient for hot path)
 - Do NOT bypass DB atomic guards with application validation
 - Do NOT simplify outbox pattern at the cost of delivery guarantees
+
+---
+
+## Code Comments
+- Add concise comments for important or complex logic, especially invariants, failure handling, concurrency, and non-obvious design intent.
+- Avoid comments that merely restate what the code already makes clear.

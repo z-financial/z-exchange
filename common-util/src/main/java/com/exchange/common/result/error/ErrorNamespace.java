@@ -9,4 +9,5 @@ public class ErrorNamespace {
     public static final String KAFKA = "kafka";
     public static final String ID_GENERATOR = "id_generator";
     public static final String ENTITY_REFERENCE = "entity_reference";
+    public static final String EVENT_REFERENCE = "event_reference";
 }

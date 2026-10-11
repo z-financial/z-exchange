@@ -63,10 +63,11 @@ create table ledger_transactions (
 );
 
 create table outbox (
-	id bigint auto_increment primary key,
-	event_id varchar(64) not null,
+	internal_id bigint unsigned not null primary key,
+	/* Base62 event references are case-sensitive; utf8mb4_bin preserves their exact spelling. */
+	event_ref varchar(32) character set utf8mb4 collate utf8mb4_bin not null,
     event_type tinyint not null,
-    command_id varchar(64) not null,
+    command_ref varchar(32) character set utf8mb4 collate utf8mb4_bin not null,
     outbox_status tinyint not null,
     destination varchar(64) not null,
     partition_key varchar(64) not null,
@@ -79,9 +80,9 @@ create table outbox (
     metadata json,
     created_at timestamp(3) not null,
     updated_at timestamp(3) not null,
-    unique key(event_id),
-    key(command_id),
+    unique key(event_ref),
+    key(command_ref),
     /* Oldest-due-first claim filtering, ordering, and tuple-cursor pagination. */
-    key idx_outbox_claim(outbox_status, next_attempt_at, id)
+    key idx_outbox_claim(outbox_status, next_attempt_at, internal_id)
 );
 

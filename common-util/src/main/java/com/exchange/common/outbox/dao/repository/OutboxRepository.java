@@ -28,7 +28,7 @@ public class OutboxRepository extends DbBaseRepository<Outbox, OutboxMapper> {
 
     /*
      * INSERT IGNORE only tells us whether this attempt inserted a row. When it does not,
-     * verify the existing event id before treating the duplicate as success; same intent is
+     * verify the existing event reference before treating the duplicate as success; same intent is
      * idempotent delivery, missing state is ambiguous, and different intent is a conflict.
      */
     public OutboxInsertDecision insertWithClaimAndVerify(Outbox outbox, LocalDateTime nextAttemptAt) {
@@ -36,7 +36,7 @@ public class OutboxRepository extends DbBaseRepository<Outbox, OutboxMapper> {
             return OutboxInsertDecision.inserted(outbox);
         }
 
-        Outbox existing = selectByEventId(outbox.getEventId());
+        Outbox existing = selectByEventRef(outbox.getEventRef());
         if (existing == null) {
             return OutboxInsertDecision.existingMissingAmbiguous(outbox);
         }
@@ -46,32 +46,32 @@ public class OutboxRepository extends DbBaseRepository<Outbox, OutboxMapper> {
         return OutboxInsertDecision.existingConflict(outbox, existing);
     }
 
-    public Outbox selectByEventId(String eventId) {
-        var query = Wrappers.<Outbox>lambdaQuery().eq(Outbox::getEventId, eventId);
+    public Outbox selectByEventRef(String eventRef) {
+        var query = Wrappers.<Outbox>lambdaQuery().eq(Outbox::getEventRef, eventRef);
         return mapper.selectOne(query);
     }
 
     public int updateStatusToFinalize(Outbox outbox, OutboxStatus newStatus, LocalDateTime finalizedAt) {
         var updateWrapper = new LambdaUpdateWrapper<Outbox>();
-        updateWrapper.eq(Outbox::getEventId, outbox.getEventId())
+        updateWrapper.eq(Outbox::getEventRef, outbox.getEventRef())
                 .eq(Outbox::getOutboxStatus, outbox.getOutboxStatus())
                 .set(Outbox::getOutboxStatus, newStatus)
                 .set(Outbox::getFinalizedAt, finalizedAt);
         return mapper.update(updateWrapper);
     }
 
-    public int batchUpdateStatusToFinalize(List<Long> outboxIds, OutboxStatus oldStatus, OutboxStatus newStatus, LocalDateTime finalizedAt) {
+    public int batchUpdateStatusToFinalize(List<Long> outboxInternalIds, OutboxStatus oldStatus, OutboxStatus newStatus, LocalDateTime finalizedAt) {
         var updateWrapper = Wrappers.<Outbox>lambdaUpdate()
-                .in(Outbox::getId, outboxIds)
+                .in(Outbox::getInternalId, outboxInternalIds)
                 .eq(Outbox::getOutboxStatus, oldStatus)
                 .set(Outbox::getOutboxStatus, newStatus)
                 .set(Outbox::getFinalizedAt, finalizedAt);
         return mapper.update(updateWrapper);
     }
 
-    public int batchClaim(List<Long> outboxIds, LocalDateTime nextAttemptAt) {
+    public int batchClaim(List<Long> outboxInternalIds, LocalDateTime nextAttemptAt) {
         var updateWrapper = Wrappers.<Outbox>lambdaUpdate()
-                .in(Outbox::getId, outboxIds)
+                .in(Outbox::getInternalId, outboxInternalIds)
                 .set(Outbox::getNextAttemptAt, nextAttemptAt)
                 .setSql("attempt_count=attempt_count+1");
         return mapper.update(updateWrapper);
@@ -79,7 +79,7 @@ public class OutboxRepository extends DbBaseRepository<Outbox, OutboxMapper> {
 
     /**
      * Claims are read oldest-due-first using the same column order as idx_outbox_claim.
-     * The exclusive (nextAttemptAt, id) cursor is required because id alone is not monotonic
+     * The exclusive (nextAttemptAt, internalId) cursor is required because internalId alone is not monotonic
      * in next-attempt order. The upper boundary stays fixed for one retry cycle so the worker
      * scans a bounded due-time window instead of chasing newly eligible rows.
      *
@@ -91,9 +91,9 @@ public class OutboxRepository extends DbBaseRepository<Outbox, OutboxMapper> {
      *   AND next_attempt_at <= :rightBoundary
      *   AND (
      *       next_attempt_at > :lastNextAttemptAt
-     *       OR (next_attempt_at = :lastNextAttemptAt AND id > :lastId)
+     *       OR (next_attempt_at = :lastNextAttemptAt AND internal_id > :lastInternalId)
      *   )
-     * ORDER BY next_attempt_at ASC, id ASC
+     * ORDER BY next_attempt_at ASC, internal_id ASC
      * LIMIT :limit
      * FOR UPDATE SKIP LOCKED
      * }</pre>
@@ -101,7 +101,7 @@ public class OutboxRepository extends DbBaseRepository<Outbox, OutboxMapper> {
      * The tuple-cursor predicate is omitted for the first page when lastNextAttemptAt is null.
      */
     public List<Outbox> selectForClaimSkipLock(LocalDateTime rightBoundary, int maxRetries,
-                                                LocalDateTime lastNextAttemptAt, long lastId, int limit) {
+                                                LocalDateTime lastNextAttemptAt, long lastInternalId, int limit) {
         var query = Wrappers.<Outbox>lambdaQuery()
                 .eq(Outbox::getOutboxStatus, OutboxStatus.PENDING)
                 .lt(Outbox::getAttemptCount, maxRetries)
@@ -110,16 +110,16 @@ public class OutboxRepository extends DbBaseRepository<Outbox, OutboxMapper> {
                         .gt(Outbox::getNextAttemptAt, lastNextAttemptAt)
                         .or(sameAttemptAt -> sameAttemptAt
                                 .eq(Outbox::getNextAttemptAt, lastNextAttemptAt)
-                                .gt(Outbox::getId, lastId)))
-                .orderByAsc(Outbox::getNextAttemptAt, Outbox::getId)
+                                .gt(Outbox::getInternalId, lastInternalId)))
+                .orderByAsc(Outbox::getNextAttemptAt, Outbox::getInternalId)
                 .last("limit " + limit + " for update skip locked");
         return mapper.selectList(query);
     }
 
     private boolean sameIntent(Outbox intended, Outbox existing) {
         return Objects.equals(intended.getEventType(), existing.getEventType())
-                && Objects.equals(intended.getEventId(), existing.getEventId())
-                && Objects.equals(intended.getCommandId(), existing.getCommandId())
+                && Objects.equals(intended.getEventRef(), existing.getEventRef())
+                && Objects.equals(intended.getCommandRef(), existing.getCommandRef())
                 && Objects.equals(intended.getDestination(), existing.getDestination())
                 && Objects.equals(intended.getPartitionKey(), existing.getPartitionKey())
                 && Arrays.equals(intended.getPayload(), existing.getPayload());

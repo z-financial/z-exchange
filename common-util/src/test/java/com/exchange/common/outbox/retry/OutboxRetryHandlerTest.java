@@ -48,6 +48,7 @@ class OutboxRetryHandlerTest {
         properties.setMaxRetries(5);
         properties.setAttemptIntervalSec(5);
         Outbox outbox = Outbox.create(
+                1L,
                 1,
                 "event-1",
                 "command-1",
@@ -61,7 +62,6 @@ class OutboxRetryHandlerTest {
                 null,
                 null
         );
-        outbox.setId(1L);
 
         when(dbTxnExecutor.executeWithDefault(any())).thenAnswer(invocation ->
                 ((Supplier<Result<List<Outbox>>>) invocation.getArgument(0)).get());
@@ -121,6 +121,7 @@ class OutboxRetryHandlerTest {
 
     private Outbox outbox(long id, LocalDateTime nextAttemptAt) {
         Outbox outbox = Outbox.create(
+                id,
                 1,
                 "event-" + id,
                 "command-" + id,
@@ -134,7 +135,6 @@ class OutboxRetryHandlerTest {
                 null,
                 null
         );
-        outbox.setId(id);
         return outbox;
     }
 }

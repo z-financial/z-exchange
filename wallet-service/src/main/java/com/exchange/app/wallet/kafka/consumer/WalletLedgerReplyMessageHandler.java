@@ -11,6 +11,8 @@ import com.exchange.common.exception.CustomizedException;
 import com.exchange.common.kafka.listener.exception.KafkaListenerRetriableException;
 import com.exchange.common.identity.EntityRefCodec;
 import com.exchange.common.identity.EntityRefType;
+import com.exchange.common.identity.EventRefFactory;
+import com.exchange.common.identity.EventRefType;
 import com.exchange.common.result.Result;
 import com.exchange.common.result.error.ErrorCode;
 import com.exchange.common.result.error.RetryableErrorCode;
@@ -31,13 +33,14 @@ public class WalletLedgerReplyMessageHandler implements Consumer<EventEnvelopePb
     private final AfterPostLedgerProcessor afterPostLedgerProcessor;
     private final WalletBusinessMetrics walletBusinessMetrics;
     private final EntityRefCodec entityRefCodec;
+    private final EventRefFactory eventRefFactory;
 
     @Override
     public void accept(EventEnvelopePb envelope) {
         log.debug(
-                "handle ledger reply, eventId={}, commandId={}, eventType={}",
-                envelope.getEventId(),
-                envelope.getCommandId(),
+                "handle ledger reply, eventRef={}, commandRef={}, eventType={}",
+                envelope.getEventRef(),
+                envelope.getCommandRef(),
                 envelope.getEventType()
         );
         if (!EventType.POST_LEDGER_REPLY.equals(envelope.getEventType())) {
@@ -46,7 +49,14 @@ public class WalletLedgerReplyMessageHandler implements Consumer<EventEnvelopePb
                     "invalid event type: " + envelope.getEventType()
             );
         }
-        handlePostLedgerReply(parseReply(envelope));
+        Result<Void> eventRefValidation = eventRefFactory.validate(
+                envelope.getEventRef(), EventRefType.LEDGER_REPLY);
+        if (eventRefValidation.isFailed()) {
+            throw new AbnormalProtoDataException(
+                    WalletServiceErrorCode.SERIALIZE_ERROR,
+                    eventRefValidation.getDetail());
+        }
+        handlePostLedgerReply(envelope, parseReply(envelope));
     }
 
     private PostTransactionReplyPb parseReply(EventEnvelopePb envelope) {
@@ -61,7 +71,7 @@ public class WalletLedgerReplyMessageHandler implements Consumer<EventEnvelopePb
         }
     }
 
-    private void handlePostLedgerReply(PostTransactionReplyPb reply) {
+    private void handlePostLedgerReply(EventEnvelopePb envelope, PostTransactionReplyPb reply) {
         if (!reply.hasError()) {
             throw new AbnormalProtoDataException(
                     WalletServiceErrorCode.SERIALIZE_ERROR,
@@ -87,6 +97,11 @@ public class WalletLedgerReplyMessageHandler implements Consumer<EventEnvelopePb
                     WalletServiceErrorCode.SERIALIZE_ERROR,
                     "successful post ledger reply is missing transaction identity"
             );
+        }
+        if (!envelope.getCommandRef().equals(reply.getSourceTxnRef())) {
+            throw new AbnormalProtoDataException(
+                    WalletServiceErrorCode.SERIALIZE_ERROR,
+                    "command_ref does not match source_txn_ref");
         }
         // Reply correlation is a typed boundary value; validation never exposes or uses
         // the decoded internal storage ID.

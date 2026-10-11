@@ -19,6 +19,12 @@ public class EntityReferenceAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean(EventRefFactory.class)
+    public EventRefFactory eventRefFactory() {
+        return new DefaultEventRefFactory();
+    }
+
+    @Bean
     @ConditionalOnBean(InternalIdGenerator.class)
     @ConditionalOnMissingBean(EntityIdentityFactory.class)
     public EntityIdentityFactory entityIdentityFactory(

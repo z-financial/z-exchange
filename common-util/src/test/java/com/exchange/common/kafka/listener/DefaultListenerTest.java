@@ -55,8 +55,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DefaultListenerTest {
-    private static final String REQUEST_EVENT_ID = "wallet-event-123";
-    private static final String COMMAND_ID = "wallet-command-123";
+    private static final String REQUEST_EVENT_REF = "wallet-request-event-ref";
+    private static final String COMMAND_REF = "wallet-transaction-ref";
     private static final String ACK_FAILED_HEADER = "zx-ack-failed";
     private static final int REPLY_FAILURE_AFTER_ATTEMPTS = 5;
 
@@ -94,7 +94,7 @@ class DefaultListenerTest {
         headers = new RecordHeaders();
         envelope = envelope();
         envelopeBytes = envelope.toByteArray();
-        replyOutbox = pendingOutbox("reply:" + REQUEST_EVENT_ID + ":success");
+        replyOutbox = pendingOutbox("ledger-reply-event-ref");
     }
 
     @Test
@@ -163,7 +163,7 @@ class DefaultListenerTest {
                 KafkaListenerErrorCode.LISTENER_INTERNAL_ERROR,
                 "payload is invalid"
         );
-        Outbox failedOutbox = pendingOutbox("reply:" + REQUEST_EVENT_ID + ":error:kafka:listener_internal_error");
+        Outbox failedOutbox = pendingOutbox("ledger-failure-event-ref");
         when(messageHandler.handle(envelope)).thenThrow(failure);
         when(messageHandler.handleFailure(eq(envelope), any(ListenerFailure.class)))
                 .thenReturn(ListenerAction.reply(failedOutbox));
@@ -187,7 +187,7 @@ class DefaultListenerTest {
     @Test
     void unexpectedExceptionCreatesInternalFailureReply() {
         // KL-DL-006: unconverted server bugs are reported upstream as bounded internal failures.
-        Outbox failedOutbox = pendingOutbox("reply:" + REQUEST_EVENT_ID + ":error:kafka:listener_internal_error");
+        Outbox failedOutbox = pendingOutbox("ledger-failure-event-ref");
         when(messageHandler.handle(envelope)).thenThrow(new NullPointerException("bug"));
         when(messageHandler.handleFailure(eq(envelope), any(ListenerFailure.class)))
                 .thenReturn(ListenerAction.reply(failedOutbox));
@@ -251,7 +251,7 @@ class DefaultListenerTest {
                 KafkaListenerErrorCode.REPLY_OUTBOX_AMBIGUOUS,
                 "retry later"
         );
-        Outbox failedOutbox = pendingOutbox("reply:" + REQUEST_EVENT_ID + ":error:kafka:retry_exhausted");
+        Outbox failedOutbox = pendingOutbox("ledger-retry-exhausted-event-ref");
         when(messageHandler.handle(envelope)).thenThrow(retryable);
         when(attemptResolver.resolve(headers)).thenReturn(REPLY_FAILURE_AFTER_ATTEMPTS);
         when(messageHandler.handleFailure(eq(envelope), any(ListenerFailure.class)))
@@ -280,7 +280,7 @@ class DefaultListenerTest {
                 KafkaListenerErrorCode.REPLY_OUTBOX_AMBIGUOUS,
                 "retry later"
         );
-        Outbox failedOutbox = pendingOutbox("reply:" + REQUEST_EVENT_ID + ":error:kafka:retry_exhausted");
+        Outbox failedOutbox = pendingOutbox("ledger-retry-exhausted-event-ref");
         when(messageHandler.handle(envelope)).thenThrow(retryable);
         when(attemptResolver.resolve(headers)).thenReturn(6);
         when(messageHandler.handleFailure(eq(envelope), any(ListenerFailure.class)))
@@ -323,7 +323,7 @@ class DefaultListenerTest {
     @Test
     void duplicateSameIntentPendingOutboxIsIdempotentAndPublished() {
         // KL-DL-011: same-intent duplicate is a successful replay of the durable reply.
-        Outbox existing = pendingOutbox(replyOutbox.getEventId());
+        Outbox existing = pendingOutbox(replyOutbox.getEventRef());
         when(messageHandler.handle(envelope)).thenReturn(ListenerAction.reply(replyOutbox));
         when(outboxRepository.insertWithClaimAndVerify(eq(replyOutbox), any(LocalDateTime.class)))
                 .thenReturn(OutboxInsertDecision.existingSameIntent(replyOutbox, existing));
@@ -340,7 +340,7 @@ class DefaultListenerTest {
     @Test
     void duplicateSameIntentSentOutboxIsAckedAndImmediatePublishIsSkipped() {
         // KL-DL-011: non-pending duplicate has already left the immediate-publish path.
-        Outbox existing = pendingOutbox(replyOutbox.getEventId());
+        Outbox existing = pendingOutbox(replyOutbox.getEventRef());
         existing.setOutboxStatus(OutboxStatus.SENT);
         when(messageHandler.handle(envelope)).thenReturn(ListenerAction.reply(replyOutbox));
         when(outboxRepository.insertWithClaimAndVerify(eq(replyOutbox), any(LocalDateTime.class)))
@@ -355,7 +355,7 @@ class DefaultListenerTest {
     @Test
     void duplicateConflictingOutboxGoesToDlq() {
         // KL-DL-012: same event id with different intent is a data/contract conflict.
-        Outbox existing = pendingOutbox(replyOutbox.getEventId());
+        Outbox existing = pendingOutbox(replyOutbox.getEventRef());
         existing.setPayload("different".getBytes());
         when(messageHandler.handle(envelope)).thenReturn(ListenerAction.reply(replyOutbox));
         when(outboxRepository.insertWithClaimAndVerify(eq(replyOutbox), any(LocalDateTime.class)))
@@ -533,22 +533,23 @@ class DefaultListenerTest {
 
     private EventEnvelopePb envelope() {
         return EventEnvelopePb.newBuilder()
-                .setEventId(REQUEST_EVENT_ID)
-                .setCommandId(COMMAND_ID)
+                .setEventRef(REQUEST_EVENT_REF)
+                .setCommandRef(COMMAND_REF)
                 .setEventType("POST_LEDGER")
                 .setPayload(ByteString.copyFromUtf8("payload"))
                 .build();
     }
 
-    private Outbox pendingOutbox(String eventId) {
+    private Outbox pendingOutbox(String eventRef) {
         return Outbox.create(
+                1L,
                 1,
-                eventId,
-                COMMAND_ID,
+                eventRef,
+                COMMAND_REF,
                 OutboxStatus.PENDING,
                 "reply-topic",
-                COMMAND_ID,
-                ("payload-" + eventId).getBytes(),
+                COMMAND_REF,
+                ("payload-" + eventRef).getBytes(),
                 0,
                 LocalDateTime.now(),
                 LocalDateTime.now(),

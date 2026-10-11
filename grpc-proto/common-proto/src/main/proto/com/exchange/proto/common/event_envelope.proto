@@ -6,10 +6,10 @@ option java_multiple_files = true;
 option java_package = "com.exchange.proto.common.event";
 
 message EventEnvelopePb {
-  // unique id for kafka event
-  string event_id = 1;
-  // unique id for business
-  string command_id = 2;
+  // Immutable message identity; never an outbox storage ID.
+  string event_ref = 1;
+  // Typed business identity used for correlation and partitioning.
+  string command_ref = 2;
   // String instead of Enum, since event need to cross service (sometimes cross language),
   // String is loose coupling, better compatibility and serialization friendly
   string event_type = 3;

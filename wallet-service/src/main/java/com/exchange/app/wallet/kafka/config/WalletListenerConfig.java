@@ -86,7 +86,7 @@ public class WalletListenerConfig {
     }
 
     private ListenerAction routeFailureToDlt(EventEnvelopePb envelope, ListenerFailure failure) {
-        String detail = "wallet ledger-reply listener failure, eventId=" + envelope.getEventId()
+        String detail = "wallet ledger-reply listener failure, eventRef=" + envelope.getEventRef()
                 + ", type=" + failure.type()
                 + ", detail=" + failure.detail();
         throw new DlqException(failure.errorCode(), detail, failure.cause());

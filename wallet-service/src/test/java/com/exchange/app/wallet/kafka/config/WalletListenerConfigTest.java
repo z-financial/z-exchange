@@ -42,8 +42,8 @@ class WalletListenerConfigTest {
 
     private EventEnvelopePb envelope() {
         return EventEnvelopePb.newBuilder()
-                .setEventId("reply-event-1")
-                .setCommandId("wallet-txn-1")
+                .setEventRef("reply-event-1")
+                .setCommandRef("wallet-txn-1")
                 .setEventType("POST_LEDGER_REPLY")
                 .build();
     }

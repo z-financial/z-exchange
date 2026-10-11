@@ -47,13 +47,13 @@ public class OutboxRetryHandler {
          */
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime lastNextAttemptAt = null;
-        long lastId = 0L;
+        long lastInternalId = 0L;
         int successCount = 0, failedCount = 0;
         while (true) {
-            Result<List<Outbox>> result = claimPage(now, lastNextAttemptAt, lastId);
+            Result<List<Outbox>> result = claimPage(now, lastNextAttemptAt, lastInternalId);
             if (!result.isSuccess()) {
-                log.error("claim failed, stopping current retry cycle, lastNextAttemptAt: {}, lastId: {}, result: {}",
-                        lastNextAttemptAt, lastId, result);
+                log.error("claim failed, stopping current retry cycle, lastNextAttemptAt: {}, lastInternalId: {}, result: {}",
+                        lastNextAttemptAt, lastInternalId, result);
                 break;
             }
             List<Outbox> outboxes = result.getValue();
@@ -62,7 +62,7 @@ public class OutboxRetryHandler {
                 // batchClaim updates the database directly, so these are the pre-claim values.
                 // Advancing both fields preserves keyset pagination when timestamps are equal.
                 lastNextAttemptAt = last.getNextAttemptAt();
-                lastId = last.getId();
+                lastInternalId = last.getInternalId();
             }
 
             List<Outbox> successOutboxes = new ArrayList<>(), failedOutboxes = new ArrayList<>();
@@ -80,7 +80,7 @@ public class OutboxRetryHandler {
             }
             // Finalize only broker-acknowledged attempts; every other row remains retryable.
             if (!successOutboxes.isEmpty()) {
-                int updatedCount = outboxManager.batchUpdateStatusToFinalize(successOutboxes.stream().map(Outbox::getId).collect(Collectors.toList()), OutboxStatus.PENDING, OutboxStatus.SENT, now);
+                int updatedCount = outboxManager.batchUpdateStatusToFinalize(successOutboxes.stream().map(Outbox::getInternalId).collect(Collectors.toList()), OutboxStatus.PENDING, OutboxStatus.SENT, now);
                 if (updatedCount != successOutboxes.size()) {
                     log.error("fail to finalize success outboxes, updated count: {}, need update size: {}, outboxes: {}", updatedCount, successOutboxes.size(), successOutboxes);
                 }
@@ -102,15 +102,15 @@ public class OutboxRetryHandler {
         try {
             CompletableFuture<Result<Void>> publishFuture = publisher.publishAsync(outbox, PublishSource.RETRY);
             if (publishFuture == null) {
-                log.error("outbox publish returned null future, eventId={}, commandId={}", outbox.getEventId(), outbox.getCommandId());
+                log.error("outbox publish returned null future, eventRef={}, commandRef={}", outbox.getEventRef(), outbox.getCommandRef());
                 return CompletableFuture.completedFuture(PublishAttempt.failed(outbox));
             }
             return publishFuture.handle((result, throwable) -> {
                 if (throwable != null) {
                     log.error(
-                            "outbox publish completed exceptionally, eventId={}, commandId={}",
-                            outbox.getEventId(),
-                            outbox.getCommandId(),
+                            "outbox publish completed exceptionally, eventRef={}, commandRef={}",
+                            outbox.getEventRef(),
+                            outbox.getCommandRef(),
                             throwable
                     );
                     return PublishAttempt.failed(outbox);
@@ -121,24 +121,24 @@ public class OutboxRetryHandler {
             });
         } catch (Exception e) {
             log.error(
-                    "outbox publish setup threw exception, eventId={}, commandId={}",
-                    outbox.getEventId(),
-                    outbox.getCommandId(),
+                    "outbox publish setup threw exception, eventRef={}, commandRef={}",
+                    outbox.getEventRef(),
+                    outbox.getCommandRef(),
                     e
             );
             return CompletableFuture.completedFuture(PublishAttempt.failed(outbox));
         }
     }
 
-    private Result<List<Outbox>> claimPage(LocalDateTime now, LocalDateTime lastNextAttemptAt, long lastId) {
+    private Result<List<Outbox>> claimPage(LocalDateTime now, LocalDateTime lastNextAttemptAt, long lastInternalId) {
         // select for update skip lock + update next_attempt_at to claim
         return dbTxnExecutor.executeWithDefault(() -> {
             List<Outbox> locked = outboxManager.selectForClaimSkipLock(
-                    now, outboxConfig.getMaxRetries(), lastNextAttemptAt, lastId, outboxConfig.getPageLimit());
+                    now, outboxConfig.getMaxRetries(), lastNextAttemptAt, lastInternalId, outboxConfig.getPageLimit());
             if (locked.isEmpty()) {
                 return Result.success(List.of());
             }
-            int claimedCount = outboxManager.batchClaim(locked.stream().map(Outbox::getId).collect(Collectors.toList()), now.plusSeconds(outboxConfig.getAttemptIntervalSec()));
+            int claimedCount = outboxManager.batchClaim(locked.stream().map(Outbox::getInternalId).collect(Collectors.toList()), now.plusSeconds(outboxConfig.getAttemptIntervalSec()));
             if (claimedCount != locked.size()) {
                 log.error("unexpected claim outbox failure, claimed: {}, locked: {}", claimedCount, locked);
                 return Result.failure(OutboxErrorCode.UNEXPECTED_DB_ERROR, "unexpected claim outbox failure");

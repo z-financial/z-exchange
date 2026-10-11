@@ -24,6 +24,8 @@ import com.exchange.common.db.utils.DbTxnExecutor;
 import com.exchange.common.identity.EntityIdentityFactory;
 import com.exchange.common.identity.EntityRefCodec;
 import com.exchange.common.identity.EntityRefType;
+import com.exchange.common.identity.EventRefFactory;
+import com.exchange.common.identity.EventRefType;
 import com.exchange.common.identity.GeneratedEntityIdentity;
 import com.exchange.common.idgen.InternalIdGenerator;
 import com.exchange.common.kafka.producer.IPublisher;
@@ -67,7 +69,7 @@ public class BeforePostLedgerProcessor {
     private final UpdateBalanceSnapshotProcessor updateBalanceSnapshotProcessor;
     private final EntityIdentityFactory entityIdentityFactory;
     private final EntityRefCodec entityRefCodec;
-    // Event identity remains on the phase-one contract until the outbox identity task.
+    private final EventRefFactory eventRefFactory;
     private final InternalIdGenerator internalIdGenerator;
 
     // reserve -> snapshot: -available, +reserved
@@ -397,10 +399,12 @@ public class BeforePostLedgerProcessor {
                 log.error("wallet_account_mapping_not_found, wallet_refs: {}", walletRefs);
                 return Result.failure(WalletServiceErrorCode.WALLET_ACCOUNT_MAPPING_NOT_FOUND, "wallet_account_mapping_not_found");
             }
-            // Allocate once before the business transaction. The same persisted event ID is then
-            // reused by immediate publication and every outbox retry.
-            String eventId = Long.toString(internalIdGenerator.nextId());
-            Result<Outbox> outboxResult = ObjectBuilder.createOutbox(eventId, walletTxn, actions, mappings);
+            // Allocate and encode once before the business transaction. The persisted event
+            // reference is reused by immediate publication and every outbox retry.
+            long outboxInternalId = internalIdGenerator.nextId();
+            String eventRef = eventRefFactory.create(EventRefType.WALLET_REQUEST, outboxInternalId);
+            Result<Outbox> outboxResult = ObjectBuilder.createOutbox(
+                    outboxInternalId, eventRef, walletTxn, actions, mappings);
             if (outboxResult.isFailed()) {
                 log.error("createOutbox failed: {}", outboxResult);
                 return Result.failure(outboxResult);

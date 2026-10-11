@@ -209,8 +209,8 @@ interface EntityIdentityFactory {
 }
 
 interface EventRefFactory {
-    String newRequestRef(long outboxInternalId);
-    String replyRef(String requestEventRef, String outcome);
+    String create(EventRefType type, long internalId);
+    Result<Void> validate(String eventRef, EventRefType expectedType);
 }
 ```
 
@@ -233,8 +233,8 @@ on their own.
 The type registry is an identity protocol registry, not a place for Wallet or
 Ledger business rules. The codec must not route requests, authorize access, or
 branch on entity business behavior. `EventRefFactory` owns only canonical
-message-reference construction; the caller supplies the already classified
-reply outcome.
+message-reference construction and validation; callers select the reference
+type and supply the generated outbox `internal_id`.
 
 The existing managed `z-id-generator` bean remains the only source of new
 `internal_id` values. `EntityIdentityFactory` allocates and encodes one
@@ -368,16 +368,17 @@ reuse the stored value.
 
 Ledger uses the request's `source_txn_ref` for command correlation. A
 successful result may additionally carry the created `ledger_txn_ref`.
-Ledger reply `event_ref` remains deterministic from the request `event_ref`
-and reply outcome, so redelivery reconstructs the same identity. It does not
-need to encode the reply outbox row's `internal_id`.
+Each newly persisted Ledger reply receives an `LER` reference encoded from its
+generated outbox `internal_id`. Reprocessing one request may create multiple
+reply rows and therefore multiple reply references. Every publisher retry of
+one row reuses that row's stored reference; `command_ref` remains the Wallet
+transaction correlation and Kafka partition key.
 
-Wallet and Ledger event references use distinct canonical namespaces so a
-request and reply cannot collide. The exact namespace and deterministic reply
-encoding are finalized with the entity-reference format decisions. Event
-references are validated as message references and are excluded from the
-entity codec's decode-to-`internal_id` invariant. Their deterministic request
-and reply construction belongs to the event/outbox task, not the entity codec.
+Wallet request references use the `WER` namespace with an 11-character
+fixed-width Base62 token and six-character checksum. Ledger reply references
+use the separate `LER` namespace with the same token and checksum widths.
+Event references are validated separately from entity references and are
+excluded from the entity codec's decode-to-`internal_id` invariant.
 
 Outbox same-intent comparison, lookups, status changes, publisher metrics, and
 logs migrate from `event_id`/`command_id` to `event_ref`/`command_ref` without
@@ -467,14 +468,15 @@ pinned as required by the generator integration SPEC.
 The schema and code change together; this sequence is for implementation
 organization, not for mixed-version deployment.
 
-## 11. Remaining event-task decisions
+## 11. Event-task decisions
 
 The entity-reference registry and schema/protobuf rename matrix are fixed by
 this design and its linked matrix. Logical-bucket cardinality, assignment,
 encoding width, resulting reference length, and routing-map ownership remain
-entity-reference decisions. The event/outbox task still owns:
+entity-reference decisions. The event/outbox task fixes:
 
-1. distinct Wallet-request and Ledger-reply event namespaces;
-2. deterministic Ledger reply-reference encoding and canonical outcomes; and
-3. final outbox DDL and retry cursor SQL using `internal_id`.
+1. `WER` and `LER` as the distinct request and reply namespaces;
+2. generated Ledger reply references, one per newly persisted reply row; and
+3. generated outbox `internal_id`, `VARCHAR(32)` event references, and retry
+   cursor/index ordering by `(next_attempt_at, internal_id)`.
 

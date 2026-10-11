@@ -16,13 +16,14 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @TableName("outbox")
 public class Outbox extends BaseEntity {
-    @TableId(type = IdType.AUTO)
-    private Long id;
+    @TableId(type = IdType.INPUT)
+    @ToString.Exclude
+    private Long internalId;
     private Integer eventType;
-    // unique per outbox
-    private String eventId;
-    // unique business id
-    private String commandId;
+    // Immutable message identity exposed at the delivery boundary.
+    private String eventRef;
+    // Typed business identity used for correlation.
+    private String commandRef;
     private OutboxStatus outboxStatus;
     // kafka: topic
     private String destination;
@@ -38,10 +39,11 @@ public class Outbox extends BaseEntity {
     // recommend saving json payload here for debugging and readability
     private String metadata;
 
-    private Outbox(Integer eventType, String eventId, String commandId, OutboxStatus outboxStatus, String destination, String partitionKey, byte[] payload, Integer attemptCount, LocalDateTime lastAttemptAt, LocalDateTime nextAttemptAt, String lastError, LocalDateTime finalizedAt) {
+    private Outbox(Long internalId, Integer eventType, String eventRef, String commandRef, OutboxStatus outboxStatus, String destination, String partitionKey, byte[] payload, Integer attemptCount, LocalDateTime lastAttemptAt, LocalDateTime nextAttemptAt, String lastError, LocalDateTime finalizedAt) {
+        this.internalId = internalId;
         this.eventType = eventType;
-        this.eventId = eventId;
-        this.commandId = commandId;
+        this.eventRef = eventRef;
+        this.commandRef = commandRef;
         this.outboxStatus = outboxStatus;
         this.destination = destination;
         this.partitionKey = partitionKey;
@@ -53,7 +55,7 @@ public class Outbox extends BaseEntity {
         this.finalizedAt = finalizedAt;
     }
 
-    public static Outbox create(Integer eventType, String eventId, String commandId, OutboxStatus outboxStatus, String destination, String partitionKey, byte[] payload, Integer attemptCount, LocalDateTime lastAttemptAt, LocalDateTime nextAttemptAt, String lastError, LocalDateTime finalizedAt) {
-        return new Outbox(eventType, eventId, commandId, outboxStatus, destination, partitionKey, payload, attemptCount, lastAttemptAt, nextAttemptAt, lastError, finalizedAt);
+    public static Outbox create(Long internalId, Integer eventType, String eventRef, String commandRef, OutboxStatus outboxStatus, String destination, String partitionKey, byte[] payload, Integer attemptCount, LocalDateTime lastAttemptAt, LocalDateTime nextAttemptAt, String lastError, LocalDateTime finalizedAt) {
+        return new Outbox(internalId, eventType, eventRef, commandRef, outboxStatus, destination, partitionKey, payload, attemptCount, lastAttemptAt, nextAttemptAt, lastError, finalizedAt);
     }
 }
