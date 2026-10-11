@@ -21,7 +21,7 @@ public class WalletTransaction extends BaseEntity {
     @ToString.Exclude
     private Long internalId;
     private String walletTxnRef;
-    private String upstreamRequestRef;
+    private String walletTxnBusinessRef;
     private ServiceId initiator;
     // TODO(idempotency-db-authority): Persist a canonical requestHash and compare it on
     // replay after the Redis-only equivalence check is promoted into this phase.
@@ -34,10 +34,10 @@ public class WalletTransaction extends BaseEntity {
     }
 
     public static WalletTransaction create(Long internalId, String walletTxnRef,
-                                           String upstreamRequestRef, ServiceId initiator,
+                                           String walletTxnBusinessRef, ServiceId initiator,
                                            TransactionStatus txnStatus, TransactionType txnType,
                                            BusinessType businessType) {
-        return new WalletTransaction(internalId, walletTxnRef, upstreamRequestRef, initiator,
+        return new WalletTransaction(internalId, walletTxnRef, walletTxnBusinessRef, initiator,
                 txnStatus, txnType, businessType);
     }
 }

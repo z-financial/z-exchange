@@ -69,7 +69,7 @@ class LedgerCommandMessageHandlerTest {
         assertEquals(COMMAND_ID, outbox.getPartitionKey());
         PostTransactionReplyPb reply = PostTransactionReplyPb.parseFrom(outbox.getPayload());
         assertEquals(ErrorCodePb.ERROR_OK, reply.getError().getCode());
-        assertEquals("ledger-txn-1", reply.getLedgerTxnId());
+        assertEquals("ledger-txn-1", reply.getLedgerTxnRef());
         verify(postLedgerProcessor).postTransaction(any(PostTransactionRequestPb.class));
     }
 
@@ -176,7 +176,7 @@ class LedgerCommandMessageHandlerTest {
 
     private PostTransactionRequestPb request() {
         return PostTransactionRequestPb.newBuilder()
-                .setWalletTxnRef("ref-1")
+                .setSourceTxnRef("ref-1")
                 .setDescription("test")
                 .addEntries(entry(LedgerDirectionPb.LedgerDirection_Debit))
                 .addEntries(entry(LedgerDirectionPb.LedgerDirection_Credit))
@@ -185,7 +185,7 @@ class LedgerCommandMessageHandlerTest {
 
     private LedgerEntryPb entry(LedgerDirectionPb direction) {
         return LedgerEntryPb.newBuilder()
-                .setAccountRef("account-ref")
+                .setLedgerAccountRef("account-ref")
                 .setDirection(direction)
                 .setAmount(100)
                 .setAssetId("asset-1")

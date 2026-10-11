@@ -14,11 +14,11 @@ public final class PostTransactionResultConverter {
         }
 
         PostTransactionReplyPb.Builder builder = PostTransactionReplyPb.newBuilder();
-        if (ValidateHelper.hasText(result.walletTxnRef())) {
-            builder.setWalletTxnRef(result.walletTxnRef());
+        if (ValidateHelper.hasText(result.sourceTxnRef())) {
+            builder.setSourceTxnRef(result.sourceTxnRef());
         }
-        if (ValidateHelper.hasText(result.ledgerTxnId())) {
-            builder.setLedgerTxnId(result.ledgerTxnId());
+        if (ValidateHelper.hasText(result.ledgerTxnRef())) {
+            builder.setLedgerTxnRef(result.ledgerTxnRef());
         }
 
         if (result.isSuccess()) {

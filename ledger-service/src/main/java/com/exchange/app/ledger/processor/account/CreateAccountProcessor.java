@@ -36,19 +36,20 @@ public class CreateAccountProcessor {
 
     public CreateAccountReplyPb createAccount(CreateAccountRequestPb req) {
 
-        ServiceId serviceId = EnumMappers.serviceIdPbMapper.to(req.getServiceId());
+        ServiceId sourceServiceId = EnumMappers.serviceIdPbMapper.to(req.getSourceServiceId());
         AccountCategory category = EnumMappers.accountCategoryPbMapper.to(req.getCategory());
         NormalSide normalSide = EnumMappers.normalSidePbMapper.to(req.getNormalSide());
         OwnerType ownerType = EnumMappers.ownerTypePbMapper.to(req.getOwnerType());
 
-        Result<Void> result = validateReq(req, serviceId, category, normalSide, ownerType);
+        Result<Void> result = validateReq(req, sourceServiceId, category, normalSide, ownerType);
         if (!result.isSuccess()) {
             return replyError(result);
         }
 
-        Account accountInDb = accountManager.getByServiceAndWalletRef(serviceId, req.getWalletRef());
+        Account accountInDb = accountManager.getBySourceServiceAndAccountRef(
+                sourceServiceId, req.getSourceAccountRef());
         if (accountInDb != null) {
-            return matchesRequest(accountInDb, req, serviceId, category, normalSide, ownerType)
+            return matchesRequest(accountInDb, req, sourceServiceId, category, normalSide, ownerType)
                     ? replySuccess(accountInDb.getLedgerAccountRef(), "account already exists")
                     : replyError(LedgerServiceErrorCode.ACCOUNT_INFO_MISMATCH,
                             "account reference already exists with different attributes");
@@ -61,13 +62,14 @@ public class CreateAccountProcessor {
 
         // Account identity is allocated only for a new owner row and before persistence.
         GeneratedEntityIdentity identity = entityIdentityFactory.next(EntityRefType.LEDGER_ACCOUNT);
-        Account account = Account.create(identity.internalId(), identity.reference(), serviceId,
-                req.getWalletRef(), category, normalSide, req.getOwnerId(), ownerType,
+        Account account = Account.create(identity.internalId(), identity.reference(), sourceServiceId,
+                req.getSourceAccountRef(), category, normalSide, req.getOwnerId(), ownerType,
                 req.getAssetId(), AccountStatus.OPEN);
         if (accountManager.insertIgnore(account) == 0) {
             // A concurrent request may have inserted the same business reference first.
-            Account winner = accountManager.getByServiceAndWalletRef(serviceId, req.getWalletRef());
-            if (winner != null && matchesRequest(winner, req, serviceId, category, normalSide, ownerType)) {
+            Account winner = accountManager.getBySourceServiceAndAccountRef(
+                    sourceServiceId, req.getSourceAccountRef());
+            if (winner != null && matchesRequest(winner, req, sourceServiceId, category, normalSide, ownerType)) {
                 return replySuccess(winner.getLedgerAccountRef(), "account already exists");
             }
             if (winner != null) {
@@ -82,12 +84,12 @@ public class CreateAccountProcessor {
     private boolean matchesRequest(
             Account account,
             CreateAccountRequestPb req,
-            ServiceId serviceId,
+            ServiceId sourceServiceId,
             AccountCategory category,
             NormalSide normalSide,
             OwnerType ownerType) {
-        return account.getServiceId() == serviceId
-                && Objects.equals(account.getWalletRef(), req.getWalletRef())
+        return account.getSourceServiceId() == sourceServiceId
+                && Objects.equals(account.getSourceAccountRef(), req.getSourceAccountRef())
                 && account.getCategory() == category
                 && account.getNormalSide() == normalSide
                 && Objects.equals(account.getOwnerId(), req.getOwnerId())
@@ -95,9 +97,10 @@ public class CreateAccountProcessor {
                 && Objects.equals(account.getAssetId(), req.getAssetId());
     }
 
-    private Result<Void> validateReq(CreateAccountRequestPb req, ServiceId serviceId, AccountCategory category, NormalSide normalSide, OwnerType ownerType) {
-        if (serviceId == null || serviceId == ServiceId.UNKNOWN) {
-            return Result.failure(LedgerServiceErrorCode.INVALID_REQUEST_PARAMETER, "invalid_service_id: " + req.getServiceId());
+    private Result<Void> validateReq(CreateAccountRequestPb req, ServiceId sourceServiceId, AccountCategory category, NormalSide normalSide, OwnerType ownerType) {
+        if (sourceServiceId == null || sourceServiceId == ServiceId.UNKNOWN) {
+            return Result.failure(LedgerServiceErrorCode.INVALID_REQUEST_PARAMETER,
+                    "invalid_source_service_id: " + req.getSourceServiceId());
         }
         if (category == null || category == AccountCategory.UNKNOWN) {
             return Result.failure(LedgerServiceErrorCode.INVALID_REQUEST_PARAMETER, "invalid_category: " + req.getCategory());
@@ -109,8 +112,9 @@ public class CreateAccountProcessor {
             return Result.failure(LedgerServiceErrorCode.INVALID_REQUEST_PARAMETER, "invalid_owner_type: " + req.getOwnerType());
         }
 
+        // TODO: Select the accepted reference type from sourceServiceId when more upstreams are supported.
         Result<Void> referenceValidation =
-                entityRefCodec.validate(req.getWalletRef(), EntityRefType.WALLET);
+                entityRefCodec.validate(req.getSourceAccountRef(), EntityRefType.WALLET);
         if (referenceValidation.isFailed()) {
             return Result.failure(LedgerServiceErrorCode.INVALID_REQUEST_PARAMETER,
                     referenceValidation.getDetail());

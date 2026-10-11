@@ -16,19 +16,21 @@ public class LedgerTxnRepository extends DbBaseRepository<LedgerTxn, LedgerTxnMa
         super(mapper);
     }
 
-    public LedgerTxn getByTxnId(String txnId) {
-        var query = Wrappers.<LedgerTxn>lambdaQuery().eq(LedgerTxn::getTxnId, txnId);
+    public LedgerTxn getByLedgerTxnRef(String ledgerTxnRef) {
+        var query = Wrappers.<LedgerTxn>lambdaQuery()
+                .eq(LedgerTxn::getLedgerTxnRef, ledgerTxnRef);
         return mapper.selectOne(query);
     }
 
-    public LedgerTxn getByRefId(String referenceId) {
-        var query = Wrappers.<LedgerTxn>lambdaQuery().eq(LedgerTxn::getReferenceId, referenceId);
+    public LedgerTxn getBySourceTxnRef(String sourceTxnRef) {
+        var query = Wrappers.<LedgerTxn>lambdaQuery()
+                .eq(LedgerTxn::getSourceTxnRef, sourceTxnRef);
         return mapper.selectOne(query);
     }
 
     public int updateMetadataByPk(LedgerTxn txn) {
         LedgerTxn toUpdate = new LedgerTxn() {{
-            setId(txn.getId());
+            setInternalId(txn.getInternalId());
             setMetadata(txn.getMetadata());
             setVersion(txn.getVersion());
         }};

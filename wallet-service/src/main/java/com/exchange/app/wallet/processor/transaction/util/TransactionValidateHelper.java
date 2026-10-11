@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 public class TransactionValidateHelper {
     // simply precheck, validate simple rules like enum and amount>0
     public static Result<Void> requestPrecheck(RequestInfo requestInfo) {
-        if (Strings.isEmpty(requestInfo.upstreamRequestRef)) {
+        if (Strings.isEmpty(requestInfo.walletTxnBusinessRef)) {
             return Result.failure(WalletServiceErrorCode.INVALID_REQUEST_PARAMETER,
                     "upstream request reference is required");
         }

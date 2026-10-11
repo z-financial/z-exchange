@@ -37,7 +37,7 @@ public class AtomicTransactionProcessor {
         String token = TokenHelper.generateToken(GlobalServiceId.LEDGER.name());
 
         RequestInfo requestInfo = new RequestInfo(
-                request.getUpstreamRequestRef(), request.getInitiator(), request.getBusinessType(),
+                request.getWalletTxnBusinessRef(), request.getInitiator(), request.getBusinessType(),
                 TransactionType.ATOMIC, request.getLinesList(),
                 AtomicTransactionRequestPb.getDescriptor().getName(), token);
         Result<String> idempResult = idempPrecheckProcessor.idempAndValidatePrecheck(requestInfo);

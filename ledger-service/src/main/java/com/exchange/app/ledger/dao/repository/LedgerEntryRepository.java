@@ -24,24 +24,26 @@ public class LedgerEntryRepository extends DbBaseRepository<LedgerEntry, LedgerE
         this.dbQueryConfig = dbQueryConfig;
     }
 
-    public List<LedgerEntry> getByTransactionId(String txnId) {
+    public List<LedgerEntry> getByLedgerTxnRef(String ledgerTxnRef) {
         List<LedgerEntry> result = new ArrayList<>();
-        long lastId = 0L;
+        long lastInternalId = 0L;
         List<LedgerEntry> batch;
         int batchSize = dbQueryConfig.getDefaultBatchSize();
 
         do {
-            batch = getByTransactionIdAndLastId(txnId, lastId, batchSize);
+            batch = getByLedgerTxnRefAndLastInternalId(
+                    ledgerTxnRef, lastInternalId, batchSize);
             result.addAll(batch);
 
             if (!batch.isEmpty()) {
-                lastId = batch.get(batch.size() - 1).getId();
+                lastInternalId = batch.getLast().getInternalId();
             }
 
-            log.debug("Fetched batch of size {} for transactionId {}", batch.size(), txnId);
+            log.debug("fetched ledger entry batch, size={}, ledgerTxnRef={}",
+                    batch.size(), ledgerTxnRef);
         } while (batch.size() == batchSize);
 
-        log.debug("Completed fetching all ledger entries for transactionId {}", txnId);
+        log.debug("completed ledger entry fetch, ledgerTxnRef={}", ledgerTxnRef);
         return result;
     }
 
@@ -53,12 +55,13 @@ public class LedgerEntryRepository extends DbBaseRepository<LedgerEntry, LedgerE
     }
 
     // set to protected scope for unit test
-    protected List<LedgerEntry> getByTransactionIdAndLastId(String txnId, long lastId, int size) {
+    protected List<LedgerEntry> getByLedgerTxnRefAndLastInternalId(
+            String ledgerTxnRef, long lastInternalId, int size) {
         return mapper.selectList(
                 Wrappers.<LedgerEntry>lambdaQuery()
-                        .eq(LedgerEntry::getTxnId, txnId)
-                        .gt(LedgerEntry::getId, lastId)
-                        .orderByAsc(LedgerEntry::getId)
+                        .eq(LedgerEntry::getLedgerTxnRef, ledgerTxnRef)
+                        .gt(LedgerEntry::getInternalId, lastInternalId)
+                        .orderByAsc(LedgerEntry::getInternalId)
                         .last("LIMIT " + size)
         );
     }

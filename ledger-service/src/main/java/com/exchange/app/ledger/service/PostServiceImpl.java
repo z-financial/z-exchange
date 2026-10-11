@@ -27,14 +27,20 @@ public class PostServiceImpl extends PostServiceGrpc.PostServiceImplBase {
     private final LedgerBusinessMetrics ledgerBusinessMetrics;
 
     @Override
-    public void getTxnById(GetTxnByIdRequestPb request, StreamObserver<GetTxnReplyPb> responseObserver) {
-        handleTransactionRequest(GetLedgerTxnProcessor.LookupType.TXN_ID, request.getLedgerTxnId(),
+    public void getTxnByLedgerTxnRef(
+            GetTxnByLedgerTxnRefRequestPb request,
+            StreamObserver<GetTxnReplyPb> responseObserver) {
+        handleTransactionRequest(
+                GetLedgerTxnProcessor.LookupType.LEDGER_TXN_REF, request.getLedgerTxnRef(),
                 request.getIncludeEntries(), responseObserver);
     }
 
     @Override
-    public void getTxnByRefId(GetTxnByRefIdRequestPb request, StreamObserver<GetTxnReplyPb> responseObserver) {
-        handleTransactionRequest(GetLedgerTxnProcessor.LookupType.REF_ID, request.getReferenceId(),
+    public void getTxnBySourceTxnRef(
+            GetTxnBySourceTxnRefRequestPb request,
+            StreamObserver<GetTxnReplyPb> responseObserver) {
+        handleTransactionRequest(
+                GetLedgerTxnProcessor.LookupType.SOURCE_TXN_REF, request.getSourceTxnRef(),
                 request.getIncludeEntries(), responseObserver);
     }
 
@@ -86,11 +92,11 @@ public class PostServiceImpl extends PostServiceGrpc.PostServiceImplBase {
     }
 
     private String operationFor(GetLedgerTxnProcessor.LookupType lookupType) {
-        if (lookupType == GetLedgerTxnProcessor.LookupType.TXN_ID) {
-            return LedgerMetricTagValues.Operations.GET_LEDGER_TXN_BY_ID;
+        if (lookupType == GetLedgerTxnProcessor.LookupType.LEDGER_TXN_REF) {
+            return LedgerMetricTagValues.Operations.GET_LEDGER_TXN_BY_LEDGER_REF;
         }
-        if (lookupType == GetLedgerTxnProcessor.LookupType.REF_ID) {
-            return LedgerMetricTagValues.Operations.GET_LEDGER_TXN_BY_REF;
+        if (lookupType == GetLedgerTxnProcessor.LookupType.SOURCE_TXN_REF) {
+            return LedgerMetricTagValues.Operations.GET_LEDGER_TXN_BY_SOURCE_REF;
         }
         return LedgerMetricTagValues.UNKNOWN;
     }

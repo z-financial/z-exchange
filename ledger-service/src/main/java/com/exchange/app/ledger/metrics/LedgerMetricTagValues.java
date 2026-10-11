@@ -6,8 +6,8 @@ public final class LedgerMetricTagValues {
 
     public static final class Operations {
         public static final String POST_TRANSACTION = "post_transaction";
-        public static final String GET_LEDGER_TXN_BY_ID = "get_ledger_txn_by_id";
-        public static final String GET_LEDGER_TXN_BY_REF = "get_ledger_txn_by_ref";
+        public static final String GET_LEDGER_TXN_BY_LEDGER_REF = "get_ledger_txn_by_ledger_ref";
+        public static final String GET_LEDGER_TXN_BY_SOURCE_REF = "get_ledger_txn_by_source_ref";
 
         private Operations() {
         }
@@ -70,8 +70,8 @@ public final class LedgerMetricTagValues {
     }
 
     public static final class CacheTypes {
-        public static final String LEDGER_REF = "ledger_ref";
-        public static final String LEDGER_TXN = "ledger_txn";
+        public static final String SOURCE_TXN_REF = "source_txn_ref";
+        public static final String LEDGER_TXN_REF = "ledger_txn_ref";
         public static final String IDEMPOTENCY = "idempotency";
 
         private CacheTypes() {
@@ -163,8 +163,8 @@ public final class LedgerMetricTagValues {
 
     public static final class DbOperations {
         public static final String ACCOUNT_REF_LOOKUP = "account_ref_lookup";
-        public static final String LEDGER_TXN_LOOKUP_BY_ID = "ledger_txn_lookup_by_id";
-        public static final String LEDGER_TXN_LOOKUP_BY_REF = "ledger_txn_lookup_by_ref";
+        public static final String LEDGER_TXN_LOOKUP_BY_LEDGER_REF = "ledger_txn_lookup_by_ledger_ref";
+        public static final String LEDGER_TXN_LOOKUP_BY_SOURCE_REF = "ledger_txn_lookup_by_source_ref";
         public static final String LEDGER_ENTRY_LOOKUP = "ledger_entry_lookup";
         public static final String LEDGER_TXN_INSERT = "ledger_txn_insert";
         public static final String LEDGER_ENTRY_BATCH_INSERT = "ledger_entry_batch_insert";

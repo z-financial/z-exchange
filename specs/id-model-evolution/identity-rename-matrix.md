@@ -1,6 +1,6 @@
 # Identity Schema and Protobuf Rename Matrix
 
-Status: Fixed for clean cutover | Last updated: 2026-10-10
+Status: Fixed for clean cutover | Last updated: 2026-10-11
 
 This matrix is normative for the phase-two identity cutover. Existing protobuf
 field numbers are retained when a field is renamed. Caller-owned business
@@ -46,8 +46,8 @@ not generate or reinterpret the value.
 | `wallet_reservations.wallet_id` | `wallet_ref` | generated Wallet reference |
 | `wallet_reservations.reserve_txn_id` | `reserve_wallet_txn_ref` | generated Wallet transaction reference |
 | `wallets.reference_id` | `wallet_business_ref` | caller-owned Wallet business reference |
-| `wallet_transactions.reference_id` | `upstream_request_ref` | caller-owned command-level request reference |
-| `wallet_transactions.idempotency_key` | removed | `upstream_request_ref` is the idempotency key within `initiator` |
+| `wallet_transactions.reference_id` | `wallet_txn_business_ref` | caller-owned Wallet transaction business reference |
+| `wallet_transactions.idempotency_key` | removed | `wallet_txn_business_ref` is the idempotency key within `initiator` |
 | `wallet_reservations.reference_id` | `wallet_reservation_business_ref` | derived reservation business reference |
 | `balance_snapshots.wallet_id` | `wallet_ref` | generated Wallet reference; snapshot PK remains `id` |
 | `balance_snapshots.wallet_reference_id` | `wallet_business_ref` | caller-owned Wallet business reference |
@@ -56,8 +56,9 @@ not generate or reinterpret the value.
 | `wallet_account_mappings.account_ref_id` | `ledger_account_ref` | generated Ledger account reference |
 | `ledger_entries.txn_id` | `ledger_txn_ref` | generated Ledger transaction reference |
 | `ledger_entries.account_id` | `ledger_account_ref` | generated Ledger account reference |
-| `ledger_transactions.reference_id` | `wallet_txn_ref` | source Wallet command identity |
-| `accounts.reference_id` | `wallet_ref` | source Wallet identity |
+| `ledger_transactions.reference_id` | `source_txn_ref` | source transaction identity |
+| `accounts.service_id` | `source_service_id` | source service namespace |
+| `accounts.reference_id` | `source_account_ref` | source account identity |
 | `outbox.command_id` | `command_ref` | typed command/correlation reference |
 
 The following fields remain caller data with unchanged meaning:
@@ -83,7 +84,7 @@ No protobuf field carries an outbox `internal_id`.
 | `ReserveTransactionReplyPb` | 2 | `transaction_id` | `wallet_txn_ref` | Wallet transaction reference |
 | `TwoStepTransactionReplyPb` | 2 | `transaction_id` | `wallet_txn_ref` | Wallet transaction reference |
 | `ApplyReservationTransactionReplyPb` | 2 | `transaction_id` | `wallet_txn_ref` | Wallet transaction reference |
-| transaction request messages | 1 | `reference_id` | `upstream_request_ref` | command-level caller reference and idempotency key within `initiator` |
+| transaction request messages | 1 | `reference_id` | `wallet_txn_business_ref` | Wallet transaction business reference and idempotency key within `initiator` |
 | transaction request messages | 3 | `idempotency_key` | removed | duplicate caller identity is unnecessary before launch |
 | `TransactionLinePb` | 1 | `wallet_ref` | unchanged name, typed semantics | Wallet reference |
 | `TransactionLinePb` | 5 | `reservation_ref` | unchanged name, typed semantics | reservation reference |
@@ -105,24 +106,25 @@ RPC and message names migrate with their identity semantics:
 
 | Message | Field number | Current field | Target field | Meaning |
 | --- | ---: | --- | --- | --- |
-| `CreateAccountRequestPb` | 1 | `reference_id` | `wallet_ref` | source Wallet reference |
+| `CreateAccountRequestPb` | 1 | `reference_id` | `source_account_ref` | source account reference |
+| `CreateAccountRequestPb` | 2 | `service_id` | `source_service_id` | source service namespace |
 | `CreateAccountReplyPb` | 2 (new) | — | `ledger_account_ref` | created or replayed Ledger account reference |
-| `PostTransactionRequestPb` | 1 | `referenceId` | `wallet_txn_ref` | source Wallet transaction reference |
-| `PostTransactionReplyPb` | 1 | `referenceId` | `wallet_txn_ref` | source Wallet transaction reference |
+| `PostTransactionRequestPb` | 1 | `referenceId` | `source_txn_ref` | source transaction reference |
+| `PostTransactionReplyPb` | 1 | `referenceId` | `source_txn_ref` | source transaction reference |
 | `PostTransactionReplyPb` | 2 | `ledgerTxnId` | `ledger_txn_ref` | Ledger transaction reference |
 | `GetTxnByIdRequestPb` | 1 | `ledgerTxnId` | `ledger_txn_ref` | Ledger transaction reference |
-| `GetTxnByRefIdRequestPb` | 1 | `referenceId` | `wallet_txn_ref` | source Wallet transaction reference |
+| `GetTxnByRefIdRequestPb` | 1 | `referenceId` | `source_txn_ref` | source transaction reference |
 | `LedgerTransactionPb` | 1 | `ledgerTxnId` | `ledger_txn_ref` | Ledger transaction reference |
-| `LedgerTransactionPb` | 2 | `referenceId` | `wallet_txn_ref` | source Wallet transaction reference |
+| `LedgerTransactionPb` | 2 | `referenceId` | `source_txn_ref` | source transaction reference |
 | `LedgerEntryPb` | 1 | `ledgerEntryId` | `ledger_entry_ref` | Ledger entry reference |
 | `LedgerEntryPb` | 2 | `accountRef` | `ledger_account_ref` | Ledger account reference |
 
 RPC and message names migrate with their identity semantics:
 
 - `GetTxnByIdRequestPb` → `GetTxnByLedgerTxnRefRequestPb`;
-- `GetTxnByRefIdRequestPb` → `GetTxnByWalletTxnRefRequestPb`;
+- `GetTxnByRefIdRequestPb` → `GetTxnBySourceTxnRefRequestPb`;
 - `getTxnById` → `getTxnByLedgerTxnRef`; and
-- `getTxnByRefId` → `getTxnByWalletTxnRef`.
+- `getTxnByRefId` → `getTxnBySourceTxnRef`.
 
 ## 6. Boundary enforcement
 

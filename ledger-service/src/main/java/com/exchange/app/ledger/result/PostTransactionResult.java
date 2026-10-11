@@ -7,8 +7,8 @@ import java.util.Objects;
 // Transport-neutral result for the post ledger use case.
 // Keeps exact ledger error codes and metric facts before conversion to protobuf.
 public record PostTransactionResult(
-        String walletTxnRef,
-        String ledgerTxnId,
+        String sourceTxnRef,
+        String ledgerTxnRef,
         LedgerServiceErrorCode errorCode,
         String detail,
         Kind kind,
@@ -23,11 +23,11 @@ public record PostTransactionResult(
             if (errorCode != null) {
                 throw new IllegalArgumentException("successful post result should not have errorCode");
             }
-            if (ValidateHelper.isBlank(walletTxnRef)) {
-                throw new IllegalArgumentException("successful post result requires walletTxnRef");
+            if (ValidateHelper.isBlank(sourceTxnRef)) {
+                throw new IllegalArgumentException("successful post result requires sourceTxnRef");
             }
-            if (ValidateHelper.isBlank(ledgerTxnId)) {
-                throw new IllegalArgumentException("successful post result requires ledgerTxnId");
+            if (ValidateHelper.isBlank(ledgerTxnRef)) {
+                throw new IllegalArgumentException("successful post result requires ledgerTxnRef");
             }
         }
         if (kind == Kind.CREATED && entryCount <= 0) {
@@ -38,10 +38,11 @@ public record PostTransactionResult(
         }
     }
 
-    public static PostTransactionResult created(String walletTxnRef, String ledgerTxnId, String detail, int entryCount) {
+    public static PostTransactionResult created(
+            String sourceTxnRef, String ledgerTxnRef, String detail, int entryCount) {
         return new PostTransactionResult(
-                walletTxnRef,
-                ledgerTxnId,
+                sourceTxnRef,
+                ledgerTxnRef,
                 null,
                 detail,
                 Kind.CREATED,
@@ -51,14 +52,14 @@ public record PostTransactionResult(
     }
 
     public static PostTransactionResult idempotentReplay(
-            String walletTxnRef,
-            String ledgerTxnId,
+            String sourceTxnRef,
+            String ledgerTxnRef,
             String detail,
             IdempotentSource source
     ) {
         return new PostTransactionResult(
-                walletTxnRef,
-                ledgerTxnId,
+                sourceTxnRef,
+                ledgerTxnRef,
                 null,
                 detail,
                 Kind.IDEMPOTENT_REPLAY,

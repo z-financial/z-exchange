@@ -43,7 +43,7 @@ Done when:
 - Account, transaction, and entry rows use generated `internal_id` primary keys and unique typed refs.
 - Legacy owner `id` and generated business-ID columns are removed.
 - Relationships, APIs, protobufs, caches, logs, and reconciliation output use Ledger or Wallet typed refs.
-- `wallet_txn_ref` is the Ledger command identity; successful replies expose `ledger_txn_ref`.
+- Ledger stores the Wallet `wallet_txn_ref` as `source_txn_ref`; successful replies expose `ledger_txn_ref`.
 - Reprocessing the same command creates no duplicate accounting effect and returns stored references.
 
 ## Task 4 — Migrate event and outbox identity

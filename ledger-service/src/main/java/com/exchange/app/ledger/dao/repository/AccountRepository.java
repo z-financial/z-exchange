@@ -25,9 +25,9 @@ public class AccountRepository extends DbBaseRepository<Account, AccountMapper> 
         return mapper.selectList(wrapper);
     }
 
-    public Account getByServiceAndWalletRef(ServiceId serviceId, String walletRef) {
+    public Account getBySourceServiceAndAccountRef(ServiceId sourceServiceId, String sourceAccountRef) {
         return mapper.selectOne(queryLambdaWrapper()
-                .eq(Account::getServiceId, serviceId)
-                .eq(Account::getWalletRef, walletRef));
+                .eq(Account::getSourceServiceId, sourceServiceId)
+                .eq(Account::getSourceAccountRef, sourceAccountRef));
     }
 }

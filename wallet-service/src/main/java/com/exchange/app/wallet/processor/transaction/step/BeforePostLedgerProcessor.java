@@ -231,7 +231,7 @@ public class BeforePostLedgerProcessor {
         // The generator call is deliberately outside updateDbToCreateTxn's transaction callback.
         return ObjectBuilder.createTransaction(
                 entityIdentityFactory.next(EntityRefType.WALLET_TRANSACTION), requestInfo.transactionType,
-                requestInfo.upstreamRequestRef, serviceId, businessType);
+                requestInfo.walletTxnBusinessRef, serviceId, businessType);
     }
 
     private Result<Void> validateEntityReferences(List<TransactionLinePb> lines) {

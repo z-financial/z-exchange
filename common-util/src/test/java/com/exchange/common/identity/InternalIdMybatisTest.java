@@ -43,7 +43,7 @@ class InternalIdMybatisTest {
             statement.execute("""
                     CREATE TABLE internal_id_probe (
                         internal_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
-                        entity_ref CHAR(22) CHARACTER SET ascii COLLATE ascii_bin NOT NULL UNIQUE,
+                        entity_ref VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL UNIQUE,
                         CONSTRAINT chk_internal_id_positive_long
                             CHECK (internal_id BETWEEN 1 AND 9223372036854775807)
                     )

@@ -176,14 +176,14 @@ Caller-provided business references are not generated entity identity. A field
 currently named `reference_id` must be classified before renaming:
 
 - Wallet creation uses `wallet_business_ref` within `service_id`;
-- Wallet commands use `upstream_request_ref` within `initiator` as their single
+- Wallet commands use `wallet_txn_business_ref` within `initiator` as their single
   caller-owned idempotency identity; and
 - fields that actually identify another covered entity become that entity's
   typed `*_ref`.
 
 Wallet command requests and `wallet_transactions` contain no separate
 `idempotency_key`. Redis and MySQL use the same
-`(initiator, upstream_request_ref)` identity. Persisting a canonical request
+`(initiator, wallet_txn_business_ref)` identity. Persisting a canonical request
 hash for durable same-key/different-payload detection remains a follow-up TODO
 and is not added in this phase.
 
@@ -298,12 +298,14 @@ Ledger schema and model relationships change as follows:
 | --- | --- | --- |
 | `ledger_entries.txn_id` | `ledger_txn_ref` | owning Ledger transaction |
 | `ledger_entries.account_id` | `ledger_account_ref` | affected Ledger account |
-| `ledger_transactions.reference_id` | `wallet_txn_ref` | source Wallet transaction |
-| `accounts.reference_id` | `wallet_ref` | source Wallet for Wallet-owned accounts |
+| `ledger_transactions.reference_id` | `source_txn_ref` | source transaction |
+| `accounts.service_id` | `source_service_id` | source service namespace |
+| `accounts.reference_id` | `source_account_ref` | source account identity |
 
-The last mapping reflects the current Wallet-to-Ledger account creation flow.
-If accounts later support multiple owner services, the contract needs an
-explicit typed source reference rather than a generic `reference_id`.
+The current Wallet flow supplies its `wallet_ref` as `source_account_ref` and
+its `wallet_txn_ref` as `source_txn_ref`. Ledger transaction rows reserve a
+nullable `source_service_id`; populating and validating it is deferred until
+the transaction contract accepts multiple upstream services.
 
 There are no foreign keys across service databases. Full typed references are
 the authoritative relationship both within a service and across services.
@@ -334,10 +336,10 @@ Required boundary renames include:
   `wallet_txn_ref` or `ledger_txn_ref`;
 - `event_id` becomes `event_ref`;
 - `command_id` becomes `command_ref`;
-- Wallet-to-Ledger command identity and Kafka partition key use
-  `wallet_txn_ref`; and
+- Wallet-to-Ledger command identity is exposed by Ledger as `source_txn_ref`,
+  while the Kafka partition key remains Wallet's `wallet_txn_ref`; and
 - successful Ledger replies expose `ledger_txn_ref` while retaining the source
-  `wallet_txn_ref` for correlation.
+  `source_txn_ref` for correlation.
 
 Field numbers in existing protobuf messages should be retained when a field's
 semantics are a direct rename. Generated Java call sites, tests, and stored
@@ -364,7 +366,7 @@ For Wallet requests, `command_ref` and the Kafka partition key are the
 with Wallet state and the outbox row. Immediate publication and every retry
 reuse the stored value.
 
-Ledger uses the request's `wallet_txn_ref` for command correlation. A
+Ledger uses the request's `source_txn_ref` for command correlation. A
 successful result may additionally carry the created `ledger_txn_ref`.
 Ledger reply `event_ref` remains deterministic from the request `event_ref`
 and reply outcome, so redelivery reconstructs the same identity. It does not

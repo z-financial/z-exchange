@@ -12,7 +12,7 @@ import java.util.Comparator;
 import java.util.List;
 
 public class RequestInfo {
-    public final String upstreamRequestRef;
+    public final String walletTxnBusinessRef;
     public final ServiceIdPb serviceIdPb;
     public final BusinessTypePb businessTypePb;
     public final TransactionType transactionType;
@@ -24,10 +24,10 @@ public class RequestInfo {
 
     private String stableHash;
 
-    public RequestInfo(String upstreamRequestRef, ServiceIdPb serviceIdPb,
+    public RequestInfo(String walletTxnBusinessRef, ServiceIdPb serviceIdPb,
                        BusinessTypePb businessTypePb, TransactionType transactionType,
                        List<TransactionLinePb> linePbs, String requestName, String token) {
-        this.upstreamRequestRef = upstreamRequestRef;
+        this.walletTxnBusinessRef = walletTxnBusinessRef;
         this.serviceIdPb = serviceIdPb;
         this.businessTypePb = businessTypePb;
         this.transactionType = transactionType;
@@ -42,7 +42,7 @@ public class RequestInfo {
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append(upstreamRequestRef).append("|")
+        sb.append(walletTxnBusinessRef).append("|")
                 .append(serviceIdPb).append("|")
                 .append(businessTypePb).append("|")
                 .append(transactionType).append("|")
@@ -67,6 +67,6 @@ public class RequestInfo {
 
     /** Redis key for the same identity enforced by the database unique constraint. */
     public String idempotencyCacheKey() {
-        return serviceIdPb.getNumber() + ":" + upstreamRequestRef;
+        return serviceIdPb.getNumber() + ":" + walletTxnBusinessRef;
     }
 }

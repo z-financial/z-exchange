@@ -52,12 +52,12 @@ class IdempPrecheckProcessorTest {
                 anyString(), anyString(), eq("2:upstream-request-1"),
                 anyString(), anyString(), any(Duration.class)))
                 .thenReturn(Result.failure(RedisErrorCode.CONNECTION, "redis unavailable"));
-        when(walletTransactionRepository.selectByUpstreamRequestRef(any(), anyString())).thenReturn(null);
+        when(walletTransactionRepository.selectByWalletTxnBusinessRef(any(), anyString())).thenReturn(null);
 
         Result<String> result = processor.idempAndValidatePrecheck(requestInfo());
 
         assertTrue(result.isSuccess());
-        verify(walletTransactionRepository).selectByUpstreamRequestRef(any(), anyString());
+        verify(walletTransactionRepository).selectByWalletTxnBusinessRef(any(), anyString());
     }
 
     @Test
@@ -83,13 +83,13 @@ class IdempPrecheckProcessorTest {
                 .thenReturn(Result.failure(RedisErrorCode.MALFORMED_VALUE, "malformed"));
         when(idempotencyClient.forceDeleteIdemp(anyString(), anyString(), anyString()))
                 .thenReturn(Result.success(true));
-        when(walletTransactionRepository.selectByUpstreamRequestRef(any(), anyString())).thenReturn(null);
+        when(walletTransactionRepository.selectByWalletTxnBusinessRef(any(), anyString())).thenReturn(null);
 
         Result<String> result = processor.idempAndValidatePrecheck(requestInfo());
 
         assertTrue(result.isSuccess());
         verify(idempotencyClient).forceDeleteIdemp(anyString(), anyString(), anyString());
-        verify(walletTransactionRepository).selectByUpstreamRequestRef(any(), anyString());
+        verify(walletTransactionRepository).selectByWalletTxnBusinessRef(any(), anyString());
     }
 
     private RequestInfo requestInfo() {

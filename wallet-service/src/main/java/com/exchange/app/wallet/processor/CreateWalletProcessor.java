@@ -147,8 +147,8 @@ public class CreateWalletProcessor {
 
     private Result<String> createAccount(Wallet wallet) {
         CreateAccountRequestPb req = CreateAccountRequestPb.newBuilder()
-                .setServiceId(ServiceIdPb.ServiceIdPb_Wallet)
-                .setWalletRef(wallet.getWalletRef())
+                .setSourceServiceId(ServiceIdPb.ServiceIdPb_Wallet)
+                .setSourceAccountRef(wallet.getWalletRef())
                 .setAssetId(wallet.getAssetId())
                 .setCategory(AccountCategoryPb.AccountCategory_Liability)
                 .setNormalSide(NormalSidePb.NormalSidePb_Credit)

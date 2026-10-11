@@ -67,7 +67,7 @@ public class IdempPrecheckProcessor {
         }
 
         WalletTransaction walletTxn = idempDbCheck(
-                requestInfo.serviceIdPb, requestInfo.upstreamRequestRef);
+                requestInfo.serviceIdPb, requestInfo.walletTxnBusinessRef);
         if (walletTxn != null) {
             // set idemp to DONE when found wallet txn
             Result<Void> markDoneResult = idempotencyClient.markIdempDone(
@@ -130,13 +130,13 @@ public class IdempPrecheckProcessor {
 
     private WalletTransaction idempDbCheck(
             ServiceIdPb serviceIdPb,
-            String upstreamRequestRef) {
+            String walletTxnBusinessRef) {
         // TODO(idempotency-db-authority): Persist the canonical request hash with Wallet's DB
         //  transaction and compare it on every DB fallback/replay. The same
-        //  (initiator, upstream_request_ref) with the same hash must replay the stored result;
+        //  (initiator, wallet_txn_business_ref) with the same hash must replay the stored result;
         //  a different hash must return HASH_CONFLICT even after Redis loss or expiry. Target design:
         //  design/proposals/redis-idempotency-db-authoritative.md.
         ServiceId serviceId = EnumPbMappers.serviceIdPbMapper.to(serviceIdPb);
-        return walletTransactionManager.selectByUpstreamRequestRef(serviceId, upstreamRequestRef);
+        return walletTransactionManager.selectByWalletTxnBusinessRef(serviceId, walletTxnBusinessRef);
     }
 }

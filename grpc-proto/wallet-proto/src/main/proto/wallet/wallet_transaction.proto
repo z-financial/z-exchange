@@ -9,7 +9,7 @@ import "wallet/wallet_enum.proto";
 import "com/exchange/proto/common/error.proto";
 
 message AtomicTransactionRequestPb {
-  string upstream_request_ref = 1;
+  string wallet_txn_business_ref = 1;
   ServiceIdPb initiator = 2;
   BusinessTypePb business_type = 3;
   repeated TransactionLinePb lines = 4;
@@ -22,7 +22,7 @@ message AtomicTransactionReplyPb {
 }
 
 message ReserveTransactionRequestPb {
-  string upstream_request_ref = 1;
+  string wallet_txn_business_ref = 1;
   ServiceIdPb initiator = 2;
   BusinessTypePb business_type = 3;
   repeated TransactionLinePb lines = 4;
@@ -36,7 +36,7 @@ message ReserveTransactionReplyPb {
 }
 
 message TwoStepTransactionRequestPb {
-  string upstream_request_ref = 1;
+  string wallet_txn_business_ref = 1;
   ServiceIdPb initiator = 2;
   BusinessTypePb business_type = 3;
   repeated TransactionLinePb lines = 4;
@@ -49,7 +49,7 @@ message TwoStepTransactionReplyPb {
 }
 
 message ApplyReservationTransactionRequestPb   {
-  string upstream_request_ref = 1;
+  string wallet_txn_business_ref = 1;
   ServiceIdPb initiator = 2;
   BusinessTypePb business_type = 3;
   repeated TransactionLinePb lines = 4;

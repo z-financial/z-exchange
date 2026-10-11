@@ -4,6 +4,8 @@ import com.exchange.app.ledger.dao.store.LedgerTxnStore;
 import com.exchange.app.ledger.po.ledger.LedgerEntry;
 import com.exchange.app.ledger.po.ledger.LedgerTxn;
 import com.exchange.app.ledger.result.LedgerServiceErrorCode;
+import com.exchange.common.identity.EntityRefCodec;
+import com.exchange.common.identity.EntityRefType;
 import com.exchange.common.result.Result;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,9 +24,18 @@ import java.util.List;
 public class GetLedgerTxnProcessor {
     private final LedgerEntryRepository ledgerEntryRepository;
     private final LedgerTxnStore ledgerTxnStore;
+    private final EntityRefCodec entityRefCodec;
 
     public enum LookupType {
-        TXN_ID, REF_ID
+        LEDGER_TXN_REF(EntityRefType.LEDGER_TRANSACTION),
+        // TODO: Resolve the expected reference type from sourceServiceId when more upstreams are supported.
+        SOURCE_TXN_REF(EntityRefType.WALLET_TRANSACTION);
+
+        private final EntityRefType entityRefType;
+
+        LookupType(EntityRefType entityRefType) {
+            this.entityRefType = entityRefType;
+        }
     }
 
     @RequiredArgsConstructor
@@ -43,16 +54,23 @@ public class GetLedgerTxnProcessor {
             log.error("lookup_type is required");
             return Result.failure(LedgerServiceErrorCode.INTERNAL_ERROR, "lookup_type is required");
         }
+        Result<Void> referenceValidation = entityRefCodec.validate(
+                lookupValue, type.entityRefType);
+        if (referenceValidation.isFailed()) {
+            return Result.failure(
+                    LedgerServiceErrorCode.INVALID_REQUEST_PARAMETER,
+                    referenceValidation.getDetail());
+        }
 
         // Step 2: Query the ledger transaction
         LedgerTxn ledgerTxn;
         Result<LedgerTxn> ledgerResult = null;
         switch (type) {
-            case TXN_ID:
-                ledgerResult = ledgerTxnStore.getByTxnId(lookupValue);
+            case LEDGER_TXN_REF:
+                ledgerResult = ledgerTxnStore.getByLedgerTxnRef(lookupValue);
                 break;
-            case REF_ID:
-                ledgerResult = ledgerTxnStore.getByRefId(lookupValue);
+            case SOURCE_TXN_REF:
+                ledgerResult = ledgerTxnStore.getBySourceTxnRef(lookupValue);
                 break;
             default:
                 log.error("Invalid lookup type: {}", type);
@@ -71,7 +89,7 @@ public class GetLedgerTxnProcessor {
 
         // Step 3: Query entries if requested
         List<LedgerEntry> ledgerEntries = includeEntries
-                ? ledgerEntryRepository.getByTransactionId(ledgerTxn.getTxnId())
+                ? ledgerEntryRepository.getByLedgerTxnRef(ledgerTxn.getLedgerTxnRef())
                 : null;
 
         if (includeEntries && CollectionUtils.isEmpty(ledgerEntries)) {

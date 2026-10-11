@@ -13,8 +13,8 @@ service AccountService {
 }
 
 message CreateAccountRequestPb {
-  string wallet_ref = 1;
-  ServiceIdPb service_id = 2;
+  string source_account_ref = 1;
+  ServiceIdPb source_service_id = 2;
   string asset_id = 3;
   AccountCategoryPb category = 4;
   NormalSidePb normal_side = 5;

@@ -12,7 +12,7 @@ class OutboxHelperTest {
         WalletTransaction transaction = new WalletTransaction();
         transaction.setWalletTxnRef("wallet-txn-ref-1");
         PostTransactionRequestPb request = PostTransactionRequestPb.newBuilder()
-                .setWalletTxnRef(transaction.getWalletTxnRef())
+                .setSourceTxnRef(transaction.getWalletTxnRef())
                 .build();
 
         var outbox = OutboxHelper.fromPostTransactionRequest("701", request, transaction);

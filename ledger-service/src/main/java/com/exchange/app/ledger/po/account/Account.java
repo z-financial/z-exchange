@@ -18,8 +18,8 @@ public class Account {
     @ToString.Exclude
     private Long internalId;
     private String ledgerAccountRef;
-    private ServiceId serviceId;
-    private String walletRef;
+    private ServiceId sourceServiceId;
+    private String sourceAccountRef;
     private AccountCategory category;
     private NormalSide normalSide;
     private String ownerId;
@@ -27,11 +27,11 @@ public class Account {
     private String assetId;
     private AccountStatus accountStatus;
 
-    public static Account create(Long internalId, String ledgerAccountRef, ServiceId serviceId,
-                                 String walletRef, AccountCategory category, NormalSide normalSide,
+    public static Account create(Long internalId, String ledgerAccountRef, ServiceId sourceServiceId,
+                                 String sourceAccountRef, AccountCategory category, NormalSide normalSide,
                                  String ownerId, OwnerType ownerType, String assetId,
                                  AccountStatus accountStatus) {
-        return new Account(internalId, ledgerAccountRef, serviceId, walletRef, category, normalSide,
+        return new Account(internalId, ledgerAccountRef, sourceServiceId, sourceAccountRef, category, normalSide,
                 ownerId, ownerType, assetId, accountStatus);
     }
 }

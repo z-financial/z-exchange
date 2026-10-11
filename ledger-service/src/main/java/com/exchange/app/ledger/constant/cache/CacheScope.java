@@ -10,20 +10,18 @@ public class CacheScope {
     // Cache scope for ledger entry operations
     final static public String LEDGER_ENTRY_CACHE = "entry";
 
-    // scope for ledger_txn_id -> ledger_txn
-    final static public String LEDGER_TXN_ID_SCOPE = LEDGER_TXN_CACHE + ":id";
+    // scope for ledger_txn_ref -> ledger_txn
+    final static public String LEDGER_TXN_REF_SCOPE = LEDGER_TXN_CACHE + ":ledger-ref";
 
-    // scope for ledger_ref_id -> txn_id
-    final static public String LEDGER_REF_ID_SCOPE = LEDGER_TXN_CACHE + ":ref";
+    // scope for source_txn_ref -> ledger_txn_ref
+    final static public String SOURCE_TXN_REF_SCOPE = LEDGER_TXN_CACHE + ":source-ref";
 
-    // method to generate LedgerTxnId key
-    public static String ledgerTxnIdKey(String txnId) {
-        return LEDGER_TXN_ID_SCOPE + ":" + txnId;
+    public static String ledgerTxnRefKey(String ledgerTxnRef) {
+        return LEDGER_TXN_REF_SCOPE + ":" + ledgerTxnRef;
     }
 
-    // method to generate LedgerRefId key
-    public static String ledgerRefIdKey(String refId) {
-        return LEDGER_REF_ID_SCOPE + ":" + refId;
+    public static String sourceTxnRefKey(String sourceTxnRef) {
+        return SOURCE_TXN_REF_SCOPE + ":" + sourceTxnRef;
     }
 
 }

@@ -36,6 +36,8 @@ import static org.mockito.Mockito.when;
 class WalletLedgerReplyMessageHandlerTest {
     private static final String WALLET_TXN_REF = new DefaultEntityRefCodec()
             .encode(EntityRefType.WALLET_TRANSACTION, 1L);
+    private static final String LEDGER_TXN_REF = new DefaultEntityRefCodec()
+            .encode(EntityRefType.LEDGER_TRANSACTION, 2L);
 
     @Mock
     private AfterPostLedgerProcessor afterPostLedgerProcessor;
@@ -148,8 +150,8 @@ class WalletLedgerReplyMessageHandlerTest {
 
     private PostTransactionReplyPb successReply() {
         return PostTransactionReplyPb.newBuilder()
-                .setWalletTxnRef(WALLET_TXN_REF)
-                .setLedgerTxnId("ledger-txn-1")
+                .setSourceTxnRef(WALLET_TXN_REF)
+                .setLedgerTxnRef(LEDGER_TXN_REF)
                 .setError(error(ErrorCodePb.ERROR_OK, "success"))
                 .build();
     }

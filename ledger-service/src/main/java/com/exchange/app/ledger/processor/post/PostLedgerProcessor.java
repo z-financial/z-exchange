@@ -17,9 +17,10 @@ import com.exchange.common.redis.idemp.utils.CommonIdempHelper;
 import com.exchange.common.redis.idemp.utils.IdempValue;
 import com.exchange.common.constant.GlobalServiceId;
 import com.exchange.common.db.utils.DbTxnExecutor;
-import com.exchange.common.idgen.InternalIdGenerator;
 import com.exchange.common.identity.EntityRefCodec;
 import com.exchange.common.identity.EntityRefType;
+import com.exchange.common.identity.EntityIdentityFactory;
+import com.exchange.common.identity.GeneratedEntityIdentity;
 import com.exchange.common.result.error.IdempErrorCode;
 import com.exchange.common.result.error.RedisErrorCode;
 import com.exchange.common.result.IResult;
@@ -56,7 +57,7 @@ public class PostLedgerProcessor {
 
     final private DbTxnExecutor dbTxnExecutor;
     private final LedgerTxnStore ledgerTxnStore;
-    private final InternalIdGenerator internalIdGenerator;
+    private final EntityIdentityFactory entityIdentityFactory;
     private final EntityRefCodec entityRefCodec;
 
     public PostTransactionResult postTransaction(PostTransactionRequestPb req) {
@@ -83,14 +84,17 @@ public class PostLedgerProcessor {
         IdempDecision idempDecision = idempResult.getValue();
         if (idempDecision.isReplay()) {
             return PostTransactionResult.idempotentReplay(
-                    req.getWalletTxnRef(),
-                    idempDecision.txnId(),
+                    req.getSourceTxnRef(),
+                    idempDecision.ledgerTxnRef(),
                     "already exists",
                     idempDecision.source()
             );
         }
 
-        List<String> accountRefs = req.getEntriesList().stream().map(LedgerEntryPb::getAccountRef).distinct().collect(Collectors.toList());
+        List<String> accountRefs = req.getEntriesList().stream()
+                .map(LedgerEntryPb::getLedgerAccountRef)
+                .distinct()
+                .collect(Collectors.toList());
         Set<String> persistedAccountRefs = accountManager.getByLedgerAccountRefs(accountRefs).stream()
                 .map(Account::getLedgerAccountRef)
                 .collect(Collectors.toSet());
@@ -103,12 +107,15 @@ public class PostLedgerProcessor {
         }
 
         // Allocate the complete Ledger object graph before entering the business DB transaction.
-        String txnId = nextInternalId();
-        LedgerTxn ledgerTxn = LedgerTxn.create(txnId, req.getWalletTxnRef());
+        GeneratedEntityIdentity txnIdentity =
+                entityIdentityFactory.next(EntityRefType.LEDGER_TRANSACTION);
+        LedgerTxn ledgerTxn = LedgerTxn.create(
+                txnIdentity.internalId(), txnIdentity.reference(), req.getSourceTxnRef());
         List<LedgerEntry> entries = new ArrayList<>();
         for (LedgerEntryPb entryPb : req.getEntriesList()) {
             entries.add(createLedgerEntry(
-                    nextInternalId(), txnId, entryPb, entryPb.getAccountRef()));
+                    entityIdentityFactory.next(EntityRefType.LEDGER_ENTRY),
+                    ledgerTxn.getLedgerTxnRef(), entryPb, entryPb.getLedgerAccountRef()));
         }
         Result<Void> result = dbTxnExecutor.executeWithDefault(() -> {
             if (ledgerTxnRepository.insertIgnore(ledgerTxn) == 0) {
@@ -133,14 +140,15 @@ public class PostLedgerProcessor {
         ledgerTxnStore.postInsert(ledgerTxn);
         // set idemp to DONE when found ledger txn
         Result<Void> markDoneResult = idempotencyClient.markIdempDone(GlobalServiceId.LEDGER.code, SCOPE,
-                req.getWalletTxnRef(), getReqStableHash(req), token, txnId,
+                req.getSourceTxnRef(), getReqStableHash(req), token, ledgerTxn.getLedgerTxnRef(),
                 JitterHelper.jitter(idempConfig.getDoneTtl(), idempConfig.getJitterMs()));
         if (markDoneResult.isFailed()) {
             log.warn("mark ledger idempotency done failed after DB commit, result={}", markDoneResult);
         }
 
         // Return domain facts; callers decide how to expose them as protobuf, outbox, or metrics.
-        return PostTransactionResult.created(req.getWalletTxnRef(), txnId, "success", entries.size());
+        return PostTransactionResult.created(
+                req.getSourceTxnRef(), ledgerTxn.getLedgerTxnRef(), "success", entries.size());
     }
 
     private Result<IdempDecision> idempClaimAndReqValidate(PostTransactionRequestPb req, String token) {
@@ -159,10 +167,10 @@ public class PostLedgerProcessor {
             switch (idempValue.status) {
                 case PENDING:
                     // another request with same params is in processing (but likely no wallet_txn has been persisted in db)
-                    log.error("another same ledger request is still processing, wallet_txn_ref={}", req.getWalletTxnRef());
+                    log.error("another same ledger request is still processing, source_txn_ref={}", req.getSourceTxnRef());
                     return Result.failure(LedgerServiceErrorCode.REQUEST_IN_PROCESSING, "request still processing");
                 case ACCEPTED:
-                    log.info("ledger request replayed from Redis idempotency, wallet_txn_ref={}", req.getWalletTxnRef());
+                    log.info("ledger request replayed from Redis idempotency, source_txn_ref={}", req.getSourceTxnRef());
                     return Result.success(IdempDecision.replay(idempValue.content, PostTransactionResult.IdempotentSource.REDIS));
                 default:
                     log.error("unknown idemp state:{}", idempValue);
@@ -171,20 +179,21 @@ public class PostLedgerProcessor {
         }
 
         // TODO(idempotency-db-authority): Persist the canonical request hash with the Ledger
-        //  transaction and compare it before treating this reference ID as a replay. A different
-        //  request using the same reference ID must remain a conflict after Redis loss or expiry.
+        //  transaction and compare it before treating source_txn_ref as a replay. A different
+        //  request using the same source_txn_ref must remain a conflict after Redis loss or expiry.
         //  Target design: design/proposals/redis-idempotency-db-authoritative.md.
-        LedgerTxn txn = ledgerTxnRepository.getByRefId(req.getWalletTxnRef());
+        LedgerTxn txn = ledgerTxnRepository.getBySourceTxnRef(req.getSourceTxnRef());
         if (txn != null) {
             // set idemp to DONE when found ledger txn
             Result<Void> markDoneResult = idempotencyClient.markIdempDone(GlobalServiceId.LEDGER.code, SCOPE,
-                    req.getWalletTxnRef(), getReqStableHash(req), token, txn.getTxnId(),
+                    req.getSourceTxnRef(), getReqStableHash(req), token, txn.getLedgerTxnRef(),
                     JitterHelper.jitter(idempConfig.getDoneTtl(), idempConfig.getJitterMs()));
             if (markDoneResult.isFailed()) {
                 log.warn("mark ledger idempotency done failed after DB replay, result={}", markDoneResult);
             }
             log.info("ledger txn already exists, {}", txn);
-            return Result.success(IdempDecision.replay(txn.getTxnId(), PostTransactionResult.IdempotentSource.DB));
+            return Result.success(IdempDecision.replay(
+                    txn.getLedgerTxnRef(), PostTransactionResult.IdempotentSource.DB));
         }
         return Result.success(IdempDecision.newTransaction());
     }
@@ -192,7 +201,7 @@ public class PostLedgerProcessor {
     private Result<IdempValue> claimIdempCacheIfAbsent(PostTransactionRequestPb req, String token) {
         String reqHash = getReqStableHash(req);
         Result<Boolean> claimResult = idempotencyClient.claimIdempIfAbsent(GlobalServiceId.LEDGER.code, SCOPE,
-                req.getWalletTxnRef(), reqHash, token, JitterHelper.jitter(idempConfig.getPendingTtl(), idempConfig.getJitterMs()));
+                req.getSourceTxnRef(), reqHash, token, JitterHelper.jitter(idempConfig.getPendingTtl(), idempConfig.getJitterMs()));
         if (claimResult.isFailed()) {
             log.warn("claim ledger idempotency failed, falling back to DB idempotency, result={}", claimResult);
             return Result.success();
@@ -202,7 +211,7 @@ public class PostLedgerProcessor {
         }
 
         Result<IdempValue> valueResult = idempotencyClient.getIdempAndVerifyHash(
-                GlobalServiceId.LEDGER.code, SCOPE, req.getWalletTxnRef(), reqHash);
+                GlobalServiceId.LEDGER.code, SCOPE, req.getSourceTxnRef(), reqHash);
         if (valueResult.isFailed()) {
             if (Result.is(valueResult, IdempErrorCode.HASH_CONFLICT)) {
                 return Result.failure(LedgerServiceErrorCode.REQUEST_HASH_CONFLICT, valueResult.getDetail());
@@ -213,7 +222,7 @@ public class PostLedgerProcessor {
                 // force delete key here, value is malformed and possibly cannot get a token to verify the owner.
                 // this could mis-delete the key created by a concurrent identical request, but this is extremely rare,
                 // and we have db idemp as the backstop
-                Result<Boolean> deleteResult = idempotencyClient.forceDeleteIdemp(GlobalServiceId.LEDGER.code, SCOPE, req.getWalletTxnRef());
+                Result<Boolean> deleteResult = idempotencyClient.forceDeleteIdemp(GlobalServiceId.LEDGER.code, SCOPE, req.getSourceTxnRef());
                 if (deleteResult.isFailed()) {
                     log.warn("delete malformed ledger idempotency value failed, result={}", deleteResult);
                 }
@@ -228,7 +237,8 @@ public class PostLedgerProcessor {
 
     private Result<Void> reqPrecheck(PostTransactionRequestPb req) {
         Result<Void> referenceValidation =
-                entityRefCodec.validate(req.getWalletTxnRef(), EntityRefType.WALLET_TRANSACTION);
+                // TODO: Select the accepted reference type from sourceServiceId when it is propagated.
+                entityRefCodec.validate(req.getSourceTxnRef(), EntityRefType.WALLET_TRANSACTION);
         if (referenceValidation.isFailed()) {
             return Result.failure(LedgerServiceErrorCode.INVALID_REQUEST_PARAMETER,
                     referenceValidation.getDetail());
@@ -238,7 +248,7 @@ public class PostLedgerProcessor {
 
         for (LedgerEntryPb entry : req.getEntriesList()) {
             referenceValidation = entityRefCodec.validate(
-                    entry.getAccountRef(), EntityRefType.LEDGER_ACCOUNT);
+                    entry.getLedgerAccountRef(), EntityRefType.LEDGER_ACCOUNT);
             if (referenceValidation.isFailed()) {
                 return Result.failure(LedgerServiceErrorCode.INVALID_REQUEST_PARAMETER,
                         referenceValidation.getDetail());
@@ -280,20 +290,18 @@ public class PostLedgerProcessor {
         return Result.success();
     }
 
-    private LedgerEntry createLedgerEntry(String entryId, String txnId, LedgerEntryPb entryPb,
+    private LedgerEntry createLedgerEntry(GeneratedEntityIdentity identity,
+                                          String ledgerTxnRef, LedgerEntryPb entryPb,
                                           String ledgerAccountRef) {
         return LedgerEntry.create(
-                entryId,
-                txnId,
+                identity.internalId(),
+                identity.reference(),
+                ledgerTxnRef,
                 entryPb.getAssetId(),
                 ledgerAccountRef,
                 entryPb.getAmount(),
                 EnumMappers.directionPbMapper.to(entryPb.getDirection())
         );
-    }
-
-    private String nextInternalId() {
-        return Long.toString(internalIdGenerator.nextId());
     }
 
     private PostTransactionResult toFailure(IResult<?> result) {
@@ -306,29 +314,29 @@ public class PostLedgerProcessor {
         try {
             String idempV = CommonIdempHelper.idempPendingValue(getReqStableHash(req), token);
             Result<String> releaseResult = idempotencyClient.releaseIdempIfOwned(
-                    GlobalServiceId.LEDGER.code, SCOPE, req.getWalletTxnRef(), idempV);
+                    GlobalServiceId.LEDGER.code, SCOPE, req.getSourceTxnRef(), idempV);
             if (releaseResult.isFailed()) {
-                log.error("release ledger idempotency failed, wallet_txn_ref={}, result={}",
-                        req.getWalletTxnRef(), releaseResult);
+                log.error("release ledger idempotency failed, source_txn_ref={}, result={}",
+                        req.getSourceTxnRef(), releaseResult);
             }
         } catch (RuntimeException cleanupFailure) {
             // Compare-and-delete cleanup is best effort and must not mask the original failure.
-            log.error("release ledger idempotency threw, wallet_txn_ref={}",
-                    req.getWalletTxnRef(), cleanupFailure);
+            log.error("release ledger idempotency threw, source_txn_ref={}",
+                    req.getSourceTxnRef(), cleanupFailure);
         }
     }
 
     private String getReqStableHash(PostTransactionRequestPb req) {
         StringBuilder sb = new StringBuilder();
-        sb.append(req.getWalletTxnRef()).append("|")
+        sb.append(req.getSourceTxnRef()).append("|")
                 .append(req.getDescription()).append("|");
         List<LedgerEntryPb> sorted = new ArrayList<>(req.getEntriesList());
-        sorted.sort(Comparator.comparing(LedgerEntryPb::getAccountRef)
+        sorted.sort(Comparator.comparing(LedgerEntryPb::getLedgerAccountRef)
                 .thenComparing(LedgerEntryPb::getDirection)
                 .thenComparing(LedgerEntryPb::getAmount)
                 .thenComparing(LedgerEntryPb::getAssetId));
         for (LedgerEntryPb entry : sorted) {
-            sb.append(entry.getAccountRef()).append("|")
+            sb.append(entry.getLedgerAccountRef()).append("|")
                     .append(entry.getDirection()).append("|")
                     .append(entry.getAmount()).append("|")
                     .append(entry.getAssetId()).append("|");
@@ -336,13 +344,17 @@ public class PostLedgerProcessor {
         return StableHashHelper.stableHash(sb.toString());
     }
 
-    private record IdempDecision(boolean replay, String txnId, PostTransactionResult.IdempotentSource source) {
+    private record IdempDecision(
+            boolean replay,
+            String ledgerTxnRef,
+            PostTransactionResult.IdempotentSource source) {
         static IdempDecision newTransaction() {
             return new IdempDecision(false, null, null);
         }
 
-        static IdempDecision replay(String txnId, PostTransactionResult.IdempotentSource source) {
-            return new IdempDecision(true, txnId, source);
+        static IdempDecision replay(
+                String ledgerTxnRef, PostTransactionResult.IdempotentSource source) {
+            return new IdempDecision(true, ledgerTxnRef, source);
         }
 
         boolean isReplay() {

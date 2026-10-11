@@ -38,7 +38,7 @@ entities still adopt the new names and values. Other supporting tables receive n
 above, but references they store to covered entities still migrate.
 
 Caller-provided Wallet business references remain separate from generated entity references. For Wallet commands,
-`upstream_request_ref` within `initiator` is the single caller-owned idempotency identity; no separate
+`wallet_txn_business_ref` within `initiator` is the single caller-owned idempotency identity; no separate
 `idempotency_key` is retained. Entity references include an immutable logical routing bucket, but physical shard
 topology and migration mechanics remain outside scope.
 BalanceSnapshot identity, generator-version bits, diagnostic generator decoding, and Java support above
@@ -81,7 +81,7 @@ another physical shard, and gives persistence, caches, messages, logs, and recon
 The larger relationship indexes are an accepted cost for avoiding a second internal-only identity model and future
 lookup or migration ambiguity.
 
-Wallet's `wallet_txn_ref` becomes the Ledger command/reference identity and Kafka partition key. Successful Ledger
+Wallet's `wallet_txn_ref` is carried as Ledger's `source_txn_ref` and remains the Kafka partition key. Successful Ledger
 replies expose `ledger_txn_ref`. `command_id` becomes `command_ref`. Cache keys, structured logs, reconciliation,
 and analytical exports use typed references.
 
@@ -121,7 +121,7 @@ BalanceSnapshot and unlisted supporting tables retain their own identity model.
 APIs, messages, logs, caches, reconciliation, analytics, and persisted relationships shall use typed references and
 never expose another owner's `internal_id`. References are immutable and opaque to business code; shared routing
 infrastructure may read their logical bucket. Caller business references remain separate from generated references,
-and Wallet command replay is keyed by `(initiator, upstream_request_ref)`.
+and Wallet command replay is keyed by `(initiator, wallet_txn_business_ref)`.
 
 ### REQ-3 — Allocation, transactions, and idempotency
 

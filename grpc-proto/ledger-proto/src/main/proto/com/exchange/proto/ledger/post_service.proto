@@ -10,30 +10,30 @@ import "com/exchange/proto/common/error.proto";
 
 service PostService {
   rpc postTransaction(PostTransactionRequestPb) returns (PostTransactionReplyPb) {}
-  rpc getTxnById(GetTxnByIdRequestPb) returns (GetTxnReplyPb);
-  rpc getTxnByRefId(GetTxnByRefIdRequestPb) returns (GetTxnReplyPb);
+  rpc getTxnByLedgerTxnRef(GetTxnByLedgerTxnRefRequestPb) returns (GetTxnReplyPb);
+  rpc getTxnBySourceTxnRef(GetTxnBySourceTxnRefRequestPb) returns (GetTxnReplyPb);
 }
 
 message PostTransactionRequestPb {
-  string wallet_txn_ref = 1;
+  string source_txn_ref = 1;
   string description = 2;
   repeated LedgerEntryPb entries = 3;
 }
 
 message PostTransactionReplyPb {
-  string wallet_txn_ref = 1;
-  string ledgerTxnId = 2;
+  string source_txn_ref = 1;
+  string ledger_txn_ref = 2;
   common.ErrorPb error = 3;
 }
 
-message GetTxnByIdRequestPb {
-  string ledgerTxnId = 1;     // maps to ledger_transactions.txn_id
-  bool includeEntries = 2;    // when true, return ledger_entries for this txn_id
+message GetTxnByLedgerTxnRefRequestPb {
+  string ledger_txn_ref = 1;
+  bool include_entries = 2;
 }
 
-message GetTxnByRefIdRequestPb {
-  string referenceId = 1;     // maps to ledger_transactions.reference_id
-  bool includeEntries = 2;    // when true, return ledger_entries for the found txn
+message GetTxnBySourceTxnRefRequestPb {
+  string source_txn_ref = 1;
+  bool include_entries = 2;
 }
 
 message GetTxnReplyPb {
@@ -42,17 +42,16 @@ message GetTxnReplyPb {
   common.ErrorPb error = 3;
 }
 
-// Mirrors ledger_transactions (txn_id, reference_id, extra_data)
 message LedgerTransactionPb {
-  string ledgerTxnId = 1;   // ledger_transactions.txn_id
-  string referenceId = 2;   // ledger_transactions.reference_id
-  string extraData = 3;     // ledger_transactions.extra_data (typically JSON/text)
+  string ledger_txn_ref = 1;
+  string source_txn_ref = 2;
+  string extra_data = 3;
 }
 
 message LedgerEntryPb {
-  string ledgerEntryId = 1;
-  string accountRef = 2;
+  string ledger_entry_ref = 1;
+  string ledger_account_ref = 2;
   LedgerDirectionPb direction = 3;
   int64 amount = 4;
-  string assetId = 5;
+  string asset_id = 5;
 }

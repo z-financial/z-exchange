@@ -34,24 +34,24 @@ public class WalletTransactionRepository extends DbBaseRepository<WalletTransact
         return mapper.selectOne(query);
     }
 
-    public WalletTransaction selectByUpstreamRequestRef(
+    public WalletTransaction selectByWalletTxnBusinessRef(
             ServiceId initiator,
-            String upstreamRequestRef) {
-        return selectByUpstreamRequestRef(initiator, upstreamRequestRef, null);
+            String walletTxnBusinessRef) {
+        return selectByWalletTxnBusinessRef(initiator, walletTxnBusinessRef, null);
     }
 
-    public WalletTransaction selectByUpstreamRequestRef(
+    public WalletTransaction selectByWalletTxnBusinessRef(
             ServiceId initiator,
-            String upstreamRequestRef,
+            String walletTxnBusinessRef,
             LambdaQueryWrapper<WalletTransaction> queryWrapper) {
-        if (initiator == null || Strings.isEmpty(upstreamRequestRef)) {
+        if (initiator == null || Strings.isEmpty(walletTxnBusinessRef)) {
             throw WalletExceptionFactory.invalidValue(String.format(
-                    "initiator or upstreamRequestRef is null, initiator:%s, upstreamRequestRef:%s",
-                    initiator, upstreamRequestRef));
+                    "initiator or walletTxnBusinessRef is null, initiator:%s, walletTxnBusinessRef:%s",
+                    initiator, walletTxnBusinessRef));
         }
         LambdaQueryWrapper<WalletTransaction> query = Objects.requireNonNullElseGet(queryWrapper, LambdaQueryWrapper::new);
         query = query.eq(WalletTransaction::getInitiator, initiator)
-                .eq(WalletTransaction::getUpstreamRequestRef, upstreamRequestRef);
+                .eq(WalletTransaction::getWalletTxnBusinessRef, walletTxnBusinessRef);
         return mapper.selectOne(query);
     }
 

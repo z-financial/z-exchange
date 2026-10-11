@@ -82,7 +82,7 @@ public class WalletLedgerReplyMessageHandler implements Consumer<EventEnvelopePb
                             + ", detail=" + reply.getError().getDetail()
             );
         }
-        if (reply.getWalletTxnRef().isBlank() || reply.getLedgerTxnId().isBlank()) {
+        if (reply.getSourceTxnRef().isBlank() || reply.getLedgerTxnRef().isBlank()) {
             throw new AbnormalProtoDataException(
                     WalletServiceErrorCode.SERIALIZE_ERROR,
                     "successful post ledger reply is missing transaction identity"
@@ -91,7 +91,13 @@ public class WalletLedgerReplyMessageHandler implements Consumer<EventEnvelopePb
         // Reply correlation is a typed boundary value; validation never exposes or uses
         // the decoded internal storage ID.
         Result<Void> referenceValidation =
-                entityRefCodec.validate(reply.getWalletTxnRef(), EntityRefType.WALLET_TRANSACTION);
+                entityRefCodec.validate(reply.getSourceTxnRef(), EntityRefType.WALLET_TRANSACTION);
+        if (referenceValidation.isFailed()) {
+            throw classifyProcessingFailure(
+                    referenceValidation.getErrorCode(), referenceValidation.getDetail(), null);
+        }
+        referenceValidation =
+                entityRefCodec.validate(reply.getLedgerTxnRef(), EntityRefType.LEDGER_TRANSACTION);
         if (referenceValidation.isFailed()) {
             throw classifyProcessingFailure(
                     referenceValidation.getErrorCode(), referenceValidation.getDetail(), null);
@@ -102,7 +108,7 @@ public class WalletLedgerReplyMessageHandler implements Consumer<EventEnvelopePb
             result = walletBusinessMetrics.recordResult(
                     WalletMetricTagValues.Operations.COMPLETE_LEDGER_TRANSACTION,
                     WalletMetricTagValues.Ingress.KAFKA,
-                    () -> afterPostLedgerProcessor.afterPostLedger(reply.getWalletTxnRef())
+                    () -> afterPostLedgerProcessor.afterPostLedger(reply.getSourceTxnRef())
             );
         } catch (CustomizedException e) {
             throw classifyProcessingFailure(e.getErrorCode(), e.getMessage(), e);

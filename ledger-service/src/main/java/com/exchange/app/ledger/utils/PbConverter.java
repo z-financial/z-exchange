@@ -14,8 +14,8 @@ public class PbConverter {
             return LedgerTransactionPb.newBuilder().build();
         }
         return LedgerTransactionPb.newBuilder()
-                .setLedgerTxnId(txn.getTxnId())
-                .setReferenceId(txn.getReferenceId())
+                .setLedgerTxnRef(txn.getLedgerTxnRef())
+                .setSourceTxnRef(txn.getSourceTxnRef())
                 .setExtraData(txn.getMetadata())
                 .build();
     }
@@ -26,8 +26,8 @@ public class PbConverter {
         }
         return entries.stream()
                 .map(entry -> LedgerEntryPb.newBuilder()
-                        .setLedgerEntryId(entry.getEntryId())
-                        .setAccountRef(entry.getLedgerAccountRef())
+                        .setLedgerEntryRef(entry.getLedgerEntryRef())
+                        .setLedgerAccountRef(entry.getLedgerAccountRef())
                         .setDirection(EnumMappers.directionPbMapper.from(entry.getDirection()))
                         .setAmount(entry.getAmount())
                         .setAssetId(entry.getAssetId())

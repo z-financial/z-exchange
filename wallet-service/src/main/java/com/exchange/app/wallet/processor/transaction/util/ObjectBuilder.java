@@ -26,12 +26,12 @@ import java.util.stream.Collectors;
 public class ObjectBuilder {
     public static WalletTransaction createTransaction(GeneratedEntityIdentity identity,
                                                       TransactionType transactionType,
-                                                      String upstreamRequestRef, ServiceId serviceId,
+                                                      String walletTxnBusinessRef, ServiceId serviceId,
                                                       BusinessType businessType) {
         return WalletTransaction.create(
                 identity.internalId(),
                 identity.reference(),
-                upstreamRequestRef,
+                walletTxnBusinessRef,
                 serviceId,
                 TransactionStatus.PENDING,
                 transactionType,
@@ -50,7 +50,7 @@ public class ObjectBuilder {
                         identity.internalId(),
                         identity.reference(),
                         walletTransaction.getInitiator(),
-                        walletTransaction.getUpstreamRequestRef() + ":" + walletRef,
+                        walletTransaction.getWalletTxnBusinessRef() + ":" + walletRef,
                         walletRef,
                         line.getAssetCode(),
                         line.getAmount(),
@@ -67,7 +67,7 @@ public class ObjectBuilder {
                         identity.internalId(),
                         identity.reference(),
                         walletTransaction.getInitiator(),
-                        walletTransaction.getUpstreamRequestRef() + ":" + walletRef,
+                        walletTransaction.getWalletTxnBusinessRef() + ":" + walletRef,
                         walletRef,
                         line.getAssetCode(),
                         line.getAmount(),
@@ -152,7 +152,9 @@ public class ObjectBuilder {
         List<LedgerEntryPb> entries = new ArrayList<>();
         for (WalletAction action : actions) {
             LedgerEntryPb.Builder builder = LedgerEntryPb.newBuilder();
-            builder.setAccountRef(walletToAccount.get(action.getWalletRef())).setAmount(action.getAmount()).setAssetId(action.getAssetId());
+            builder.setLedgerAccountRef(walletToAccount.get(action.getWalletRef()))
+                    .setAmount(action.getAmount())
+                    .setAssetId(action.getAssetId());
             switch (action.getActionType()) {
                 case TRANSFER_OUT:
                     builder.setDirection(LedgerDirectionPb.LedgerDirection_Debit);
@@ -167,7 +169,7 @@ public class ObjectBuilder {
         }
 
         PostTransactionRequestPb req = PostTransactionRequestPb.newBuilder()
-                .setWalletTxnRef(txn.getWalletTxnRef())
+                .setSourceTxnRef(txn.getWalletTxnRef())
                 .addAllEntries(entries).build();
         Outbox outbox = OutboxHelper.fromPostTransactionRequest(eventId, req, txn);
         return Result.success(outbox);

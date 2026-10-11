@@ -8,8 +8,8 @@ drop table if exists wallet_transactions;
 create table wallet_transactions (
 	internal_id bigint unsigned not null primary key,
     /* Base62 references are case-sensitive; utf8mb4_bin preserves their exact spelling. */
-    wallet_txn_ref char(22) character set utf8mb4 collate utf8mb4_bin not null,
-    upstream_request_ref varchar(64) not null,
+    wallet_txn_ref varchar(32) character set utf8mb4 collate utf8mb4_bin not null,
+    wallet_txn_business_ref varchar(64) not null,
     initiator tinyint not null,
     txn_status tinyint not null,
     txn_type tinyint not null,
@@ -19,20 +19,20 @@ create table wallet_transactions (
     updated_at timestamp(3) not null,
     unique key(wallet_txn_ref),
     /* The upstream request reference is the command-level idempotency identity. */
-    unique key uk_wallet_txn_upstream_request(initiator, upstream_request_ref)
+    unique key uk_wallet_txn_business_ref(initiator, wallet_txn_business_ref)
 );
 
 drop table if exists wallet_actions;
 create table wallet_actions (
 	internal_id bigint unsigned not null primary key,
-	wallet_action_ref char(22) character set utf8mb4 collate utf8mb4_bin not null,
-    wallet_txn_ref char(22) character set utf8mb4 collate utf8mb4_bin not null,
-    wallet_ref char(22) character set utf8mb4 collate utf8mb4_bin not null,
+	wallet_action_ref varchar(32) character set utf8mb4 collate utf8mb4_bin not null,
+    wallet_txn_ref varchar(32) character set utf8mb4 collate utf8mb4_bin not null,
+    wallet_ref varchar(32) character set utf8mb4 collate utf8mb4_bin not null,
     asset_id varchar(64) not null,
     action_type tinyint not null,
     bucket tinyint not null,
     amount bigint not null,
-    wallet_reservation_ref char(22) character set utf8mb4 collate utf8mb4_bin default null comment 'RESERVE/CONSUME/RELEASE have this field',
+    wallet_reservation_ref varchar(32) character set utf8mb4 collate utf8mb4_bin default null comment 'RESERVE/CONSUME/RELEASE have this field',
     unique key(wallet_action_ref),
     key(wallet_txn_ref),
     key(wallet_ref),
@@ -42,8 +42,8 @@ create table wallet_actions (
 drop table if exists wallet_reservations;
 create table wallet_reservations (
 	internal_id bigint unsigned not null primary key,
-    wallet_reservation_ref char(22) character set utf8mb4 collate utf8mb4_bin not null,
-    wallet_ref char(22) character set utf8mb4 collate utf8mb4_bin not null,
+    wallet_reservation_ref varchar(32) character set utf8mb4 collate utf8mb4_bin not null,
+    wallet_ref varchar(32) character set utf8mb4 collate utf8mb4_bin not null,
     asset_id varchar(64) not null,
     total bigint not null,
     remaining bigint not null,
@@ -54,7 +54,7 @@ create table wallet_reservations (
     reservation_outcome tinyint not null comment 'the resolution of asset: NOT_DONE when status=ACTIVE, CONSUMED when fully consumed, RELEASED when fully releasd, PARTIAL when partially consumed and released for the rest, CANCELLED when status=CLOSED',
     initiator tinyint not null,
     wallet_reservation_business_ref varchar(64) not null,
-    reserve_wallet_txn_ref char(22) character set utf8mb4 collate utf8mb4_bin not null,
+    reserve_wallet_txn_ref varchar(32) character set utf8mb4 collate utf8mb4_bin not null,
     unique key(wallet_reservation_ref),
     key(wallet_ref),
     unique key uk_wallet_reservation_business_ref(initiator, wallet_reservation_business_ref),
@@ -63,7 +63,7 @@ create table wallet_reservations (
 
 create table wallets (
 	internal_id bigint unsigned not null primary key,
-    wallet_ref char(22) character set utf8mb4 collate utf8mb4_bin not null,
+    wallet_ref varchar(32) character set utf8mb4 collate utf8mb4_bin not null,
     service_id tinyint not null,
     wallet_business_ref varchar(64) not null,
     asset_id varchar(64) not null,
@@ -79,7 +79,7 @@ create table wallets (
 drop table if exists balance_snapshots;
 create table balance_snapshots (
 	id bigint auto_increment primary key,
-    wallet_ref char(22) character set utf8mb4 collate utf8mb4_bin not null,
+    wallet_ref varchar(32) character set utf8mb4 collate utf8mb4_bin not null,
 	service_id tinyint not null,
     wallet_business_ref varchar(64) not null,
     asset_id varchar(64) not null,
@@ -88,7 +88,7 @@ create table balance_snapshots (
     owner_id varchar(64) not null,
     available bigint default 0 not null,
     reserved bigint default 0 not null,
-	last_wallet_txn_ref char(22) character set utf8mb4 collate utf8mb4_bin,
+	last_wallet_txn_ref varchar(32) character set utf8mb4 collate utf8mb4_bin,
     version bigint not null,
     created_at timestamp(3) not null,
     updated_at timestamp(3) not null,
@@ -99,8 +99,8 @@ create table balance_snapshots (
 
 create table wallet_account_mappings (
 	id bigint auto_increment primary key,
-	wallet_ref char(22) character set utf8mb4 collate utf8mb4_bin not null,
-    ledger_account_ref char(22) character set utf8mb4 collate utf8mb4_bin not null,
+	wallet_ref varchar(32) character set utf8mb4 collate utf8mb4_bin not null,
+    ledger_account_ref varchar(32) character set utf8mb4 collate utf8mb4_bin not null,
 	unique key(wallet_ref, ledger_account_ref),
     unique key(ledger_account_ref)
 );
