@@ -9,6 +9,8 @@ import com.exchange.common.exception.AbnormalProtoDataException;
 import com.exchange.common.exception.CustomizedException;
 import com.exchange.common.exception.DbException;
 import com.exchange.common.kafka.listener.exception.KafkaListenerRetriableException;
+import com.exchange.common.identity.DefaultEntityRefCodec;
+import com.exchange.common.identity.EntityRefType;
 import com.exchange.common.result.Result;
 import com.exchange.common.result.error.DbErrorCode;
 import com.exchange.proto.common.error.ErrorCodePb;
@@ -32,7 +34,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class WalletLedgerReplyMessageHandlerTest {
-    private static final String WALLET_TXN_ID = "wallet-txn-1";
+    private static final String WALLET_TXN_REF = new DefaultEntityRefCodec()
+            .encode(EntityRefType.WALLET_TRANSACTION, 1L);
 
     @Mock
     private AfterPostLedgerProcessor afterPostLedgerProcessor;
@@ -45,19 +48,20 @@ class WalletLedgerReplyMessageHandlerTest {
         meterRegistry = new SimpleMeterRegistry();
         handler = new WalletLedgerReplyMessageHandler(
                 afterPostLedgerProcessor,
-                new WalletBusinessMetrics(meterRegistry)
+                new WalletBusinessMetrics(meterRegistry),
+                new DefaultEntityRefCodec()
         );
     }
 
     @Test
     void successfulLedgerReplyCompletesWalletTransaction() {
         // A successful reply is the only outcome allowed to enter wallet finalization.
-        when(afterPostLedgerProcessor.afterPostLedger(WALLET_TXN_ID))
+        when(afterPostLedgerProcessor.afterPostLedger(WALLET_TXN_REF))
                 .thenReturn(Result.success(mock(WalletTransaction.class)));
 
         handler.accept(envelope(successReply().toByteString()));
 
-        verify(afterPostLedgerProcessor).afterPostLedger(WALLET_TXN_ID);
+        verify(afterPostLedgerProcessor).afterPostLedger(WALLET_TXN_REF);
     }
 
     @Test
@@ -73,7 +77,7 @@ class WalletLedgerReplyMessageHandlerTest {
         );
 
         assertEquals(WalletServiceErrorCode.POST_TRANSACTION_FAILED, thrown.getErrorCode());
-        verify(afterPostLedgerProcessor, never()).afterPostLedger(WALLET_TXN_ID);
+        verify(afterPostLedgerProcessor, never()).afterPostLedger(WALLET_TXN_REF);
     }
 
     @Test
@@ -84,14 +88,14 @@ class WalletLedgerReplyMessageHandlerTest {
         );
 
         assertEquals(WalletServiceErrorCode.SERIALIZE_ERROR, thrown.getErrorCode());
-        verify(afterPostLedgerProcessor, never()).afterPostLedger(WALLET_TXN_ID);
+        verify(afterPostLedgerProcessor, never()).afterPostLedger(WALLET_TXN_REF);
     }
 
     @Test
     void unsupportedEventTypeIsNonRetryableProtocolFailure() {
         EventEnvelopePb envelope = EventEnvelopePb.newBuilder()
                 .setEventId("reply-event-1")
-                .setCommandId(WALLET_TXN_ID)
+                .setCommandId(WALLET_TXN_REF)
                 .setEventType("UNKNOWN")
                 .setPayload(successReply().toByteString())
                 .build();
@@ -102,13 +106,13 @@ class WalletLedgerReplyMessageHandlerTest {
         );
 
         assertEquals(WalletServiceErrorCode.INVALID_ENUM_ERROR, thrown.getErrorCode());
-        verify(afterPostLedgerProcessor, never()).afterPostLedger(WALLET_TXN_ID);
+        verify(afterPostLedgerProcessor, never()).afterPostLedger(WALLET_TXN_REF);
     }
 
     @Test
     void retryableDbFailureBecomesKafkaRetrySignal() {
         DbException dbFailure = DbException.unavailable("afterPostLedger", new RuntimeException("db down"));
-        when(afterPostLedgerProcessor.afterPostLedger(WALLET_TXN_ID)).thenThrow(dbFailure);
+        when(afterPostLedgerProcessor.afterPostLedger(WALLET_TXN_REF)).thenThrow(dbFailure);
 
         KafkaListenerRetriableException thrown = assertThrows(
                 KafkaListenerRetriableException.class,
@@ -120,7 +124,7 @@ class WalletLedgerReplyMessageHandlerTest {
 
     @Test
     void nonRetryableProcessorResultPreservesItsErrorCode() {
-        when(afterPostLedgerProcessor.afterPostLedger(WALLET_TXN_ID)).thenReturn(Result.failure(
+        when(afterPostLedgerProcessor.afterPostLedger(WALLET_TXN_REF)).thenReturn(Result.failure(
                 WalletServiceErrorCode.WALLET_TRANSACTION_UPDATE_FAILED,
                 "state conflict"
         ));
@@ -136,7 +140,7 @@ class WalletLedgerReplyMessageHandlerTest {
     private EventEnvelopePb envelope(ByteString payload) {
         return EventEnvelopePb.newBuilder()
                 .setEventId("reply-event-1")
-                .setCommandId(WALLET_TXN_ID)
+                .setCommandId(WALLET_TXN_REF)
                 .setEventType(EventType.POST_LEDGER_REPLY)
                 .setPayload(payload)
                 .build();
@@ -144,7 +148,7 @@ class WalletLedgerReplyMessageHandlerTest {
 
     private PostTransactionReplyPb successReply() {
         return PostTransactionReplyPb.newBuilder()
-                .setReferenceId(WALLET_TXN_ID)
+                .setWalletTxnRef(WALLET_TXN_REF)
                 .setLedgerTxnId("ledger-txn-1")
                 .setError(error(ErrorCodePb.ERROR_OK, "success"))
                 .build();

@@ -17,9 +17,10 @@ import lombok.*;
 @NoArgsConstructor
 @TableName("wallet_transactions")
 public class WalletTransaction extends BaseEntity {
-    @TableId(type = IdType.AUTO)
-    private Long id;
-    private String txnId;
+    @TableId(value = "internal_id", type = IdType.INPUT)
+    @ToString.Exclude
+    private Long internalId;
+    private String walletTxnRef;
     private String referenceId;
     private ServiceId initiator;
     private String idempotencyKey;
@@ -27,21 +28,15 @@ public class WalletTransaction extends BaseEntity {
     private TransactionType txnType;
     private BusinessType businessType;
 
-    private WalletTransaction(String txnId, String referenceId, ServiceId initiator, String idempotencyKey, TransactionStatus txnStatus, TransactionType txnType, BusinessType businessType) {
-        this.txnId = txnId;
-        this.referenceId = referenceId;
-        this.initiator = initiator;
-        this.idempotencyKey = idempotencyKey;
-        this.txnStatus = txnStatus;
-        this.txnType = txnType;
-        this.businessType = businessType;
-    }
-
     public boolean hasFinalized() {
         return txnStatus.hasFinalized();
     }
 
-    public static WalletTransaction create(String txnId, String referenceId, ServiceId initiator, String idempotentKey, TransactionStatus txnStatus, TransactionType txnType, BusinessType businessType) {
-        return new WalletTransaction(txnId, referenceId, initiator, idempotentKey, txnStatus, txnType, businessType);
+    public static WalletTransaction create(Long internalId, String walletTxnRef, String referenceId,
+                                           ServiceId initiator, String idempotentKey,
+                                           TransactionStatus txnStatus, TransactionType txnType,
+                                           BusinessType businessType) {
+        return new WalletTransaction(internalId, walletTxnRef, referenceId, initiator, idempotentKey,
+                txnStatus, txnType, businessType);
     }
 }

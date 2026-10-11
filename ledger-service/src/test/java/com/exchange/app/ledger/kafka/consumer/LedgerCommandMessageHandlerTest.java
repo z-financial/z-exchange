@@ -176,7 +176,7 @@ class LedgerCommandMessageHandlerTest {
 
     private PostTransactionRequestPb request() {
         return PostTransactionRequestPb.newBuilder()
-                .setReferenceId("ref-1")
+                .setWalletTxnRef("ref-1")
                 .setDescription("test")
                 .addEntries(entry(LedgerDirectionPb.LedgerDirection_Debit))
                 .addEntries(entry(LedgerDirectionPb.LedgerDirection_Credit))

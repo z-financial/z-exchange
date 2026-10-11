@@ -18,9 +18,9 @@ public class WalletAccountMappingRepository extends DbBaseRepository<WalletAccou
         super(mapper);
     }
 
-    public List<WalletAccountMapping> selectInWalletIds(List<String> walletIds) {
+    public List<WalletAccountMapping> selectInWalletRefs(List<String> walletRefs) {
         LambdaQueryWrapper<WalletAccountMapping> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.in(WalletAccountMapping::getWalletId, walletIds);
+        queryWrapper.in(WalletAccountMapping::getWalletRef, walletRefs);
         return mapper.selectList(queryWrapper);
     }
 }

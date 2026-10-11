@@ -15,8 +15,8 @@ service WalletService {
   rpc reserveTransaction(ReserveTransactionRequestPb) returns (ReserveTransactionReplyPb);
   rpc applyReserveTransaction(ApplyReservationTransactionRequestPb) returns (ApplyReservationTransactionReplyPb);
 
-  rpc getSnapshotByWalletId(GetSnapshotByIdRequestPb) returns (GetSnapshotReplyPb);
-  rpc getSnapshotByRefId(GetSnapshotByRefIdRequestPb) returns (GetSnapshotReplyPb);
+  rpc getSnapshotByWalletRef(GetSnapshotByWalletRefRequestPb) returns (GetSnapshotReplyPb);
+  rpc getSnapshotByBusinessRef(GetSnapshotByBusinessRefRequestPb) returns (GetSnapshotReplyPb);
 }
 
 

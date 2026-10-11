@@ -22,11 +22,11 @@ import lombok.NoArgsConstructor;
 public class BalanceSnapshot extends BaseEntity {
     @TableId(type = IdType.AUTO)
     private Long id;
-    // consistent with wallet.walletId
-    private String walletId;
+    // Typed Wallet reference; this snapshot intentionally retains its own auto-increment PK.
+    private String walletRef;
     private ServiceId serviceId;
-    // consistent with wallet.referenceId
-    private String walletReferenceId;
+    // Caller-owned business reference, not a generated entity identity.
+    private String walletBusinessRef;
     private String assetId;
     // consistent with wallet.status
     private WalletStatus walletStatus;
@@ -34,23 +34,30 @@ public class BalanceSnapshot extends BaseEntity {
     private String ownerId;
     private Long available;
     private Long reserved;
+    private String lastWalletTxnRef;
     @Version
     private Long version;
 
-    private BalanceSnapshot(String walletId, ServiceId serviceId, String walletReferenceId, String assetId, WalletStatus walletStatus, OwnerType ownerType, String ownerId, Long available, Long reserved, Long version) {
-        this.walletId = walletId;
+    private BalanceSnapshot(String walletRef, ServiceId serviceId, String walletBusinessRef, String assetId,
+                            WalletStatus walletStatus, OwnerType ownerType, String ownerId,
+                            Long available, Long reserved, String lastWalletTxnRef, Long version) {
+        this.walletRef = walletRef;
         this.serviceId = serviceId;
-        this.walletReferenceId = walletReferenceId;
+        this.walletBusinessRef = walletBusinessRef;
         this.assetId = assetId;
         this.walletStatus = walletStatus;
         this.ownerType = ownerType;
         this.ownerId = ownerId;
         this.available = available;
         this.reserved = reserved;
+        this.lastWalletTxnRef = lastWalletTxnRef;
         this.version = version;
     }
 
-    public static BalanceSnapshot create(String walletId, ServiceId serviceId, String walletReferenceId, String assetId, WalletStatus walletStatus, OwnerType ownerType, String ownerId, Long available, Long reserved, Long version) {
-        return new BalanceSnapshot(walletId, serviceId, walletReferenceId, assetId, walletStatus, ownerType, ownerId, available, reserved, version);
+    public static BalanceSnapshot create(String walletRef, ServiceId serviceId, String walletBusinessRef,
+                                         String assetId, WalletStatus walletStatus, OwnerType ownerType,
+                                         String ownerId, Long available, Long reserved, Long version) {
+        return new BalanceSnapshot(walletRef, serviceId, walletBusinessRef, assetId, walletStatus,
+                ownerType, ownerId, available, reserved, null, version);
     }
 }

@@ -25,7 +25,9 @@ public class UpdateReservationProcessor {
         if (reservations.isEmpty()) {
             return Result.success();
         }
-        List<Long> modifyReservationIds = reservations.stream().map(WalletReservation::getId).collect(Collectors.toList());
+        List<Long> modifyReservationIds = reservations.stream()
+                .map(WalletReservation::getInternalId)
+                .collect(Collectors.toList());
         // select for update to lock the rows in PK order
         var reservationFromDb = walletReservationManager.selectInIdForUpdate(modifyReservationIds);
         if (reservationFromDb.size() != modifyReservationIds.size()) {

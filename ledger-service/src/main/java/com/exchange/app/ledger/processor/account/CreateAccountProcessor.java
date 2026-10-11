@@ -14,7 +14,10 @@ import com.exchange.proto.ledger.account.CreateAccountRequestPb;
 import com.exchange.app.ledger.utils.EnumMappers;
 import com.exchange.app.ledger.utils.ValidateHelper;
 import com.exchange.app.ledger.po.enums.*;
-import com.exchange.common.idgen.InternalIdGenerator;
+import com.exchange.common.identity.EntityIdentityFactory;
+import com.exchange.common.identity.EntityRefCodec;
+import com.exchange.common.identity.EntityRefType;
+import com.exchange.common.identity.GeneratedEntityIdentity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +31,8 @@ import java.util.Objects;
 public class CreateAccountProcessor {
     final private AccountRepository accountManager;
     final private AssetRepository assetRepository;
-    final private InternalIdGenerator internalIdGenerator;
+    final private EntityIdentityFactory entityIdentityFactory;
+    final private EntityRefCodec entityRefCodec;
 
     public CreateAccountReplyPb createAccount(CreateAccountRequestPb req) {
 
@@ -42,10 +46,10 @@ public class CreateAccountProcessor {
             return replyError(result);
         }
 
-        Account accountInDb = accountManager.getByServiceAndReference(serviceId, req.getReferenceId());
+        Account accountInDb = accountManager.getByServiceAndWalletRef(serviceId, req.getWalletRef());
         if (accountInDb != null) {
             return matchesRequest(accountInDb, req, serviceId, category, normalSide, ownerType)
-                    ? replySuccess("account already exists")
+                    ? replySuccess(accountInDb.getLedgerAccountRef(), "account already exists")
                     : replyError(LedgerServiceErrorCode.ACCOUNT_INFO_MISMATCH,
                             "account reference already exists with different attributes");
         }
@@ -55,15 +59,16 @@ public class CreateAccountProcessor {
             return replyError(LedgerServiceErrorCode.ASSET_NOT_FOUND, req.getAssetId());
         }
 
-        // Allocate only after replay and request validation, and outside any business DB transaction.
-        String accountId = Long.toString(internalIdGenerator.nextId());
-        Account account = Account.create(accountId, serviceId, req.getReferenceId(), category, normalSide,
-                req.getOwnerId(), ownerType, req.getAssetId(), AccountStatus.OPEN);
+        // Account identity is allocated only for a new owner row and before persistence.
+        GeneratedEntityIdentity identity = entityIdentityFactory.next(EntityRefType.LEDGER_ACCOUNT);
+        Account account = Account.create(identity.internalId(), identity.reference(), serviceId,
+                req.getWalletRef(), category, normalSide, req.getOwnerId(), ownerType,
+                req.getAssetId(), AccountStatus.OPEN);
         if (accountManager.insertIgnore(account) == 0) {
             // A concurrent request may have inserted the same business reference first.
-            Account winner = accountManager.getByServiceAndReference(serviceId, req.getReferenceId());
+            Account winner = accountManager.getByServiceAndWalletRef(serviceId, req.getWalletRef());
             if (winner != null && matchesRequest(winner, req, serviceId, category, normalSide, ownerType)) {
-                return replySuccess("account already exists");
+                return replySuccess(winner.getLedgerAccountRef(), "account already exists");
             }
             if (winner != null) {
                 return replyError(LedgerServiceErrorCode.ACCOUNT_INFO_MISMATCH,
@@ -71,7 +76,7 @@ public class CreateAccountProcessor {
             }
             return replyError(LedgerServiceErrorCode.SERVER_ERROR, "account ID already exists");
         }
-        return replySuccess("success");
+        return replySuccess(account.getLedgerAccountRef(), "success");
     }
 
     private boolean matchesRequest(
@@ -82,7 +87,7 @@ public class CreateAccountProcessor {
             NormalSide normalSide,
             OwnerType ownerType) {
         return account.getServiceId() == serviceId
-                && Objects.equals(account.getReferenceId(), req.getReferenceId())
+                && Objects.equals(account.getWalletRef(), req.getWalletRef())
                 && account.getCategory() == category
                 && account.getNormalSide() == normalSide
                 && Objects.equals(account.getOwnerId(), req.getOwnerId())
@@ -104,6 +109,13 @@ public class CreateAccountProcessor {
             return Result.failure(LedgerServiceErrorCode.INVALID_REQUEST_PARAMETER, "invalid_owner_type: " + req.getOwnerType());
         }
 
+        Result<Void> referenceValidation =
+                entityRefCodec.validate(req.getWalletRef(), EntityRefType.WALLET);
+        if (referenceValidation.isFailed()) {
+            return Result.failure(LedgerServiceErrorCode.INVALID_REQUEST_PARAMETER,
+                    referenceValidation.getDetail());
+        }
+
         if (!ValidateHelper.validateNormalSideAndCategory(normalSide, category)) {
             return Result.failure(LedgerServiceErrorCode.INVALID_REQUEST_PARAMETER, "invalid_normal_side_category_pair: " + req.getNormalSide());
         }
@@ -111,8 +123,9 @@ public class CreateAccountProcessor {
         return Result.success();
     }
 
-    private CreateAccountReplyPb replySuccess(String detail) {
+    private CreateAccountReplyPb replySuccess(String ledgerAccountRef, String detail) {
         return CreateAccountReplyPb.newBuilder()
+                .setLedgerAccountRef(ledgerAccountRef)
                 .setError(PbErrorBuilder.success(detail))
                 .build();
     }

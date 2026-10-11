@@ -27,7 +27,7 @@ public class PbConverter {
         return entries.stream()
                 .map(entry -> LedgerEntryPb.newBuilder()
                         .setLedgerEntryId(entry.getEntryId())
-                        .setAccountRef(entry.getAccountId())
+                        .setAccountRef(entry.getLedgerAccountRef())
                         .setDirection(EnumMappers.directionPbMapper.from(entry.getDirection()))
                         .setAmount(entry.getAmount())
                         .setAssetId(entry.getAssetId())

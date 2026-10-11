@@ -8,8 +8,8 @@ public final class WalletMetricTagValues {
         public static final String ATOMIC_TRANSACTION = "atomic_transaction";
         public static final String RESERVE_TRANSACTION = "reserve_transaction";
         public static final String APPLY_RESERVATION_TRANSACTION = "apply_reservation_transaction";
-        public static final String GET_SNAPSHOT_BY_WALLET_ID = "get_snapshot_by_wallet_id";
-        public static final String GET_SNAPSHOT_BY_REF_ID = "get_snapshot_by_ref_id";
+        public static final String GET_SNAPSHOT_BY_WALLET_REF = "get_snapshot_by_wallet_ref";
+        public static final String GET_SNAPSHOT_BY_BUSINESS_REF = "get_snapshot_by_business_ref";
         public static final String COMPLETE_LEDGER_TRANSACTION = "complete_ledger_transaction";
 
         private Operations() {

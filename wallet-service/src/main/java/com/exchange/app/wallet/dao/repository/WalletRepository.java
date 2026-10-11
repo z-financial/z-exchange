@@ -17,9 +17,9 @@ public class WalletRepository extends DbBaseRepository<Wallet, WalletMapper> {
         super(mapper);
     }
 
-    public Wallet selectByWalletId(String walletId) {
+    public Wallet selectByWalletRef(String walletRef) {
         return mapper.selectOne(queryLambdaWrapper()
-                .eq(Wallet::getWalletId, walletId));
+                .eq(Wallet::getWalletRef, walletRef));
     }
 
     public Wallet selectByReferenceId(ServiceId serviceId, String referenceId) {
@@ -28,9 +28,9 @@ public class WalletRepository extends DbBaseRepository<Wallet, WalletMapper> {
                 .eq(Wallet::getReferenceId, referenceId));
     }
 
-    public int updateWalletStatus(String walletId, WalletStatus oldStatus, WalletStatus newStatus) {
+    public int updateWalletStatus(String walletRef, WalletStatus oldStatus, WalletStatus newStatus) {
         return mapper.update(updateLambdaWrapper()
-                .eq(Wallet::getWalletId, walletId)
+                .eq(Wallet::getWalletRef, walletRef)
                 .eq(Wallet::getWalletStatus, oldStatus)
                 .set(Wallet::getWalletStatus, newStatus));
     }

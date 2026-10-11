@@ -52,10 +52,10 @@ public class AtomicTransactionProcessor {
         return replySuccess(result.getValue().walletTxn, result.getDetail());
     }
 
-    private AtomicTransactionReplyPb replySuccess(String txnId, String detail) {
+    private AtomicTransactionReplyPb replySuccess(String walletTxnRef, String detail) {
         detail = Objects.requireNonNullElse(detail, "");
         return AtomicTransactionReplyPb.newBuilder()
-                .setTransactionId(txnId)
+                .setWalletTxnRef(walletTxnRef)
                 .setError(PbErrorBuilder.success(detail))
                 .build();
     }
@@ -63,7 +63,7 @@ public class AtomicTransactionProcessor {
     private AtomicTransactionReplyPb replySuccess(WalletTransaction txn, String detail) {
         detail = Objects.requireNonNullElse(detail, "");
         return AtomicTransactionReplyPb.newBuilder()
-                .setTransactionId(txn.getTxnId())
+                .setWalletTxnRef(txn.getWalletTxnRef())
                 .setStatus(EnumPbMappers.transactionStatusPbMapper.from(txn.getTxnStatus()))
                 .setError(PbErrorBuilder.success(detail))
                 .build();

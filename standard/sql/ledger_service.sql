@@ -16,10 +16,11 @@ create table assets (
 insert into assets (asset_id, asset_type, symbol, decimals) values ("asset-1", 1, "USD", 1), ("asset-2", 1, "CNY", 1);
 
 create table accounts (
-	id bigint auto_increment primary key,
-    account_id varchar(64) not null,
+	internal_id bigint unsigned not null primary key,
+    /* Base62 references are case-sensitive; utf8mb4_bin preserves their exact spelling. */
+    ledger_account_ref char(22) character set utf8mb4 collate utf8mb4_bin not null,
     service_id tinyint not null,
-    reference_id varchar(64) not null,
+    wallet_ref char(22) character set utf8mb4 collate utf8mb4_bin not null,
     category tinyint not null,
     normal_side tinyint not null,
     owner_id varchar(64) not null,
@@ -27,23 +28,21 @@ create table accounts (
     asset_id varchar(64) not null,
     account_status tinyint not null,
     extra_data text,
-    unique key(account_id),
-    unique key(service_id, reference_id),
+    unique key(ledger_account_ref),
+    unique key(service_id, wallet_ref),
     key(owner_type, owner_id)
 );
--- insert into accounts (account_id, category, normal_side, owner_id, owner_type, asset_id, account_status) values ("account-1", 1, 1, "owner-1", 2, "asset-1", 1), ("account-2", 1, 2, "owner-2", 2, "asset-1", 1);
-
 create table ledger_entries (
 	id bigint auto_increment primary key,
     entry_id varchar(64) not null,
     txn_id varchar(64) not null,
     asset_id varchar(64) not null,
-    account_id varchar(64) not null,
+    ledger_account_ref char(22) character set utf8mb4 collate utf8mb4_bin not null,
     amount bigint not null,
     direction tinyint not null,
     unique key(entry_id),
     key(txn_id, id),
-    key(account_id, direction)
+    key(ledger_account_ref, direction)
 );
 
 create table ledger_transactions (

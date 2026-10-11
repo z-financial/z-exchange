@@ -23,13 +23,13 @@ public class WalletReservationRepository extends DbBaseRepository<WalletReservat
         super(mapper);
     }
 
-    public List<WalletReservation> selectByTxnId(String txnId) {
-        return selectByTxnId(txnId, null);
+    public List<WalletReservation> selectByWalletTxnRef(String walletTxnRef) {
+        return selectByWalletTxnRef(walletTxnRef, null);
     }
 
-    public List<WalletReservation> selectByTxnId(String txnId, LambdaQueryWrapper<WalletReservation> queryWrapper) {
+    public List<WalletReservation> selectByWalletTxnRef(String walletTxnRef, LambdaQueryWrapper<WalletReservation> queryWrapper) {
         queryWrapper = Objects.requireNonNullElseGet(queryWrapper, LambdaQueryWrapper::new);
-        queryWrapper = queryWrapper.eq(WalletReservation::getReserveTxnId, txnId);
+        queryWrapper = queryWrapper.eq(WalletReservation::getReserveWalletTxnRef, walletTxnRef);
         return mapper.selectList(queryWrapper);
     }
 
@@ -42,39 +42,20 @@ public class WalletReservationRepository extends DbBaseRepository<WalletReservat
 
         var wrapper = queryLambdaWrapper()
                 .eq(WalletReservation::getInitiator, initiator)
-                .in(WalletReservation::getReferenceId, refs);
+                .in(WalletReservation::getWalletReservationRef, refs);
         return mapper.selectList(wrapper);
     }
 
     public List<WalletReservation> selectInIdForUpdate(List<Long> ids) {
         LambdaUpdateWrapper<WalletReservation> updateWrapper = new LambdaUpdateWrapper<>();
-        updateWrapper = updateWrapper.in(WalletReservation::getId, ids).last("for update");
+        updateWrapper = updateWrapper.in(WalletReservation::getInternalId, ids).last("for update");
         return mapper.selectList(updateWrapper);
     }
-
-    // id is explicit and necessary to force using PK in db txn
-    // pending-settle -> consumed
-    // TODO restrict update fields, only update status and amount
-//    public int fullySettleReservation(Long id, WalletReservation reservation, Long amount) {
-//        LambdaUpdateWrapper<WalletReservation> updateWrapper = new LambdaUpdateWrapper<>();
-//        updateWrapper = updateWrapper.eq(WalletReservation::getReserveTxnId, reservation.getReserveTxnId())
-//                .eq(WalletReservation::getId, id)
-//                .eq(WalletReservation::getWalletId, reservation.getWalletId())
-//                .eq(WalletReservation::getAssetId, reservation.getAssetId())
-//                .eq(WalletReservation::getPendingSettle, amount)
-//                .eq(WalletReservation::getReserveTxnId, reservation.getReserveTxnId())
-//                .eq(WalletReservation::getReservationStatus, ReservationStatus.ACTIVE)
-//                .set(WalletReservation::getPendingSettle, 0)
-//                .set(WalletReservation::getConsumed, amount)
-//                .set(WalletReservation::getReservationStatus, ReservationStatus.FINISHED)
-//                .set(WalletReservation::getReservationOutcome, ReservationOutcome.CONSUMED);
-//        return mapper.update(updateWrapper);
-//    }
 
     // update with optimistic lock of amount and status
     // update with all fields of now
     public int updateWithInOptimisticLock(WalletReservation now, WalletReservation old) {
-        var wrapper = updateLambdaWrapper().eq(WalletReservation::getId, now.getId())
+        var wrapper = updateLambdaWrapper().eq(WalletReservation::getInternalId, now.getInternalId())
                 .eq(WalletReservation::getReservationStatus, old.getReservationStatus())
                 .eq(WalletReservation::getRemaining, old.getRemaining())
                 .eq(WalletReservation::getPendingSettle, old.getPendingSettle())

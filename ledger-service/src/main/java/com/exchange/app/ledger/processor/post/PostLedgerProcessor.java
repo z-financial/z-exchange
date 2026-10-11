@@ -18,6 +18,8 @@ import com.exchange.common.redis.idemp.utils.IdempValue;
 import com.exchange.common.constant.GlobalServiceId;
 import com.exchange.common.db.utils.DbTxnExecutor;
 import com.exchange.common.idgen.InternalIdGenerator;
+import com.exchange.common.identity.EntityRefCodec;
+import com.exchange.common.identity.EntityRefType;
 import com.exchange.common.result.error.IdempErrorCode;
 import com.exchange.common.result.error.RedisErrorCode;
 import com.exchange.common.result.IResult;
@@ -55,6 +57,7 @@ public class PostLedgerProcessor {
     final private DbTxnExecutor dbTxnExecutor;
     private final LedgerTxnStore ledgerTxnStore;
     private final InternalIdGenerator internalIdGenerator;
+    private final EntityRefCodec entityRefCodec;
 
     public PostTransactionResult postTransaction(PostTransactionRequestPb req) {
         String token = TokenHelper.generateToken(GlobalServiceId.LEDGER.name());
@@ -80,7 +83,7 @@ public class PostLedgerProcessor {
         IdempDecision idempDecision = idempResult.getValue();
         if (idempDecision.isReplay()) {
             return PostTransactionResult.idempotentReplay(
-                    req.getReferenceId(),
+                    req.getWalletTxnRef(),
                     idempDecision.txnId(),
                     "already exists",
                     idempDecision.source()
@@ -88,10 +91,12 @@ public class PostLedgerProcessor {
         }
 
         List<String> accountRefs = req.getEntriesList().stream().map(LedgerEntryPb::getAccountRef).distinct().collect(Collectors.toList());
-        Map<String, String> accountRefToAccountId = accountManager.getAccountIdInRef(accountRefs).stream()
-                .collect(Collectors.toMap(Account::getReferenceId, Account::getAccountId));
-        if (accountRefToAccountId.size() != accountRefs.size()) {
-            Set<String> notFound = new HashSet<>(accountRefs) {{removeAll(accountRefToAccountId.keySet());}};
+        Set<String> persistedAccountRefs = accountManager.getByLedgerAccountRefs(accountRefs).stream()
+                .map(Account::getLedgerAccountRef)
+                .collect(Collectors.toSet());
+        if (persistedAccountRefs.size() != accountRefs.size()) {
+            Set<String> notFound = new HashSet<>(accountRefs);
+            notFound.removeAll(persistedAccountRefs);
             log.error("account not found, notFoundRefs={}", notFound);
             return PostTransactionResult.failure(
                     LedgerServiceErrorCode.ACCOUNT_NOT_FOUND, "account_not_found, refs: " + notFound);
@@ -99,11 +104,11 @@ public class PostLedgerProcessor {
 
         // Allocate the complete Ledger object graph before entering the business DB transaction.
         String txnId = nextInternalId();
-        LedgerTxn ledgerTxn = LedgerTxn.create(txnId, req.getReferenceId());
+        LedgerTxn ledgerTxn = LedgerTxn.create(txnId, req.getWalletTxnRef());
         List<LedgerEntry> entries = new ArrayList<>();
         for (LedgerEntryPb entryPb : req.getEntriesList()) {
             entries.add(createLedgerEntry(
-                    nextInternalId(), txnId, entryPb, accountRefToAccountId.get(entryPb.getAccountRef())));
+                    nextInternalId(), txnId, entryPb, entryPb.getAccountRef()));
         }
         Result<Void> result = dbTxnExecutor.executeWithDefault(() -> {
             if (ledgerTxnRepository.insertIgnore(ledgerTxn) == 0) {
@@ -128,14 +133,14 @@ public class PostLedgerProcessor {
         ledgerTxnStore.postInsert(ledgerTxn);
         // set idemp to DONE when found ledger txn
         Result<Void> markDoneResult = idempotencyClient.markIdempDone(GlobalServiceId.LEDGER.code, SCOPE,
-                req.getReferenceId(), getReqStableHash(req), token, txnId,
+                req.getWalletTxnRef(), getReqStableHash(req), token, txnId,
                 JitterHelper.jitter(idempConfig.getDoneTtl(), idempConfig.getJitterMs()));
         if (markDoneResult.isFailed()) {
             log.warn("mark ledger idempotency done failed after DB commit, result={}", markDoneResult);
         }
 
         // Return domain facts; callers decide how to expose them as protobuf, outbox, or metrics.
-        return PostTransactionResult.created(req.getReferenceId(), txnId, "success", entries.size());
+        return PostTransactionResult.created(req.getWalletTxnRef(), txnId, "success", entries.size());
     }
 
     private Result<IdempDecision> idempClaimAndReqValidate(PostTransactionRequestPb req, String token) {
@@ -154,10 +159,10 @@ public class PostLedgerProcessor {
             switch (idempValue.status) {
                 case PENDING:
                     // another request with same params is in processing (but likely no wallet_txn has been persisted in db)
-                    log.error("another same ledger request is still processing, referenceId={}", req.getReferenceId());
+                    log.error("another same ledger request is still processing, wallet_txn_ref={}", req.getWalletTxnRef());
                     return Result.failure(LedgerServiceErrorCode.REQUEST_IN_PROCESSING, "request still processing");
                 case ACCEPTED:
-                    log.info("ledger request replayed from Redis idempotency, referenceId={}", req.getReferenceId());
+                    log.info("ledger request replayed from Redis idempotency, wallet_txn_ref={}", req.getWalletTxnRef());
                     return Result.success(IdempDecision.replay(idempValue.content, PostTransactionResult.IdempotentSource.REDIS));
                 default:
                     log.error("unknown idemp state:{}", idempValue);
@@ -169,11 +174,11 @@ public class PostLedgerProcessor {
         //  transaction and compare it before treating this reference ID as a replay. A different
         //  request using the same reference ID must remain a conflict after Redis loss or expiry.
         //  Target design: design/proposals/redis-idempotency-db-authoritative.md.
-        LedgerTxn txn = ledgerTxnRepository.getByRefId(req.getReferenceId());
+        LedgerTxn txn = ledgerTxnRepository.getByRefId(req.getWalletTxnRef());
         if (txn != null) {
             // set idemp to DONE when found ledger txn
             Result<Void> markDoneResult = idempotencyClient.markIdempDone(GlobalServiceId.LEDGER.code, SCOPE,
-                    req.getReferenceId(), getReqStableHash(req), token, txn.getTxnId(),
+                    req.getWalletTxnRef(), getReqStableHash(req), token, txn.getTxnId(),
                     JitterHelper.jitter(idempConfig.getDoneTtl(), idempConfig.getJitterMs()));
             if (markDoneResult.isFailed()) {
                 log.warn("mark ledger idempotency done failed after DB replay, result={}", markDoneResult);
@@ -187,7 +192,7 @@ public class PostLedgerProcessor {
     private Result<IdempValue> claimIdempCacheIfAbsent(PostTransactionRequestPb req, String token) {
         String reqHash = getReqStableHash(req);
         Result<Boolean> claimResult = idempotencyClient.claimIdempIfAbsent(GlobalServiceId.LEDGER.code, SCOPE,
-                req.getReferenceId(), reqHash, token, JitterHelper.jitter(idempConfig.getPendingTtl(), idempConfig.getJitterMs()));
+                req.getWalletTxnRef(), reqHash, token, JitterHelper.jitter(idempConfig.getPendingTtl(), idempConfig.getJitterMs()));
         if (claimResult.isFailed()) {
             log.warn("claim ledger idempotency failed, falling back to DB idempotency, result={}", claimResult);
             return Result.success();
@@ -197,7 +202,7 @@ public class PostLedgerProcessor {
         }
 
         Result<IdempValue> valueResult = idempotencyClient.getIdempAndVerifyHash(
-                GlobalServiceId.LEDGER.code, SCOPE, req.getReferenceId(), reqHash);
+                GlobalServiceId.LEDGER.code, SCOPE, req.getWalletTxnRef(), reqHash);
         if (valueResult.isFailed()) {
             if (Result.is(valueResult, IdempErrorCode.HASH_CONFLICT)) {
                 return Result.failure(LedgerServiceErrorCode.REQUEST_HASH_CONFLICT, valueResult.getDetail());
@@ -208,7 +213,7 @@ public class PostLedgerProcessor {
                 // force delete key here, value is malformed and possibly cannot get a token to verify the owner.
                 // this could mis-delete the key created by a concurrent identical request, but this is extremely rare,
                 // and we have db idemp as the backstop
-                Result<Boolean> deleteResult = idempotencyClient.forceDeleteIdemp(GlobalServiceId.LEDGER.code, SCOPE, req.getReferenceId());
+                Result<Boolean> deleteResult = idempotencyClient.forceDeleteIdemp(GlobalServiceId.LEDGER.code, SCOPE, req.getWalletTxnRef());
                 if (deleteResult.isFailed()) {
                     log.warn("delete malformed ledger idempotency value failed, result={}", deleteResult);
                 }
@@ -222,10 +227,22 @@ public class PostLedgerProcessor {
     }
 
     private Result<Void> reqPrecheck(PostTransactionRequestPb req) {
+        Result<Void> referenceValidation =
+                entityRefCodec.validate(req.getWalletTxnRef(), EntityRefType.WALLET_TRANSACTION);
+        if (referenceValidation.isFailed()) {
+            return Result.failure(LedgerServiceErrorCode.INVALID_REQUEST_PARAMETER,
+                    referenceValidation.getDetail());
+        }
         Map<String, Long> debitSumMap = new HashMap<>(), creditSumMap = new HashMap<>();
         int debitCount = 0, creditCount = 0;
 
         for (LedgerEntryPb entry : req.getEntriesList()) {
+            referenceValidation = entityRefCodec.validate(
+                    entry.getAccountRef(), EntityRefType.LEDGER_ACCOUNT);
+            if (referenceValidation.isFailed()) {
+                return Result.failure(LedgerServiceErrorCode.INVALID_REQUEST_PARAMETER,
+                        referenceValidation.getDetail());
+            }
             if (entry.getAmount() == 0) {
                 return Result.failure(LedgerServiceErrorCode.INVALID_REQUEST_PARAMETER, "zero_amount: " + entry);
             }
@@ -263,12 +280,13 @@ public class PostLedgerProcessor {
         return Result.success();
     }
 
-    private LedgerEntry createLedgerEntry(String entryId, String txnId, LedgerEntryPb entryPb, String accountId) {
+    private LedgerEntry createLedgerEntry(String entryId, String txnId, LedgerEntryPb entryPb,
+                                          String ledgerAccountRef) {
         return LedgerEntry.create(
                 entryId,
                 txnId,
                 entryPb.getAssetId(),
-                accountId,
+                ledgerAccountRef,
                 entryPb.getAmount(),
                 EnumMappers.directionPbMapper.to(entryPb.getDirection())
         );
@@ -288,21 +306,21 @@ public class PostLedgerProcessor {
         try {
             String idempV = CommonIdempHelper.idempPendingValue(getReqStableHash(req), token);
             Result<String> releaseResult = idempotencyClient.releaseIdempIfOwned(
-                    GlobalServiceId.LEDGER.code, SCOPE, req.getReferenceId(), idempV);
+                    GlobalServiceId.LEDGER.code, SCOPE, req.getWalletTxnRef(), idempV);
             if (releaseResult.isFailed()) {
-                log.error("release ledger idempotency failed, referenceId={}, result={}",
-                        req.getReferenceId(), releaseResult);
+                log.error("release ledger idempotency failed, wallet_txn_ref={}, result={}",
+                        req.getWalletTxnRef(), releaseResult);
             }
         } catch (RuntimeException cleanupFailure) {
             // Compare-and-delete cleanup is best effort and must not mask the original failure.
-            log.error("release ledger idempotency threw, referenceId={}",
-                    req.getReferenceId(), cleanupFailure);
+            log.error("release ledger idempotency threw, wallet_txn_ref={}",
+                    req.getWalletTxnRef(), cleanupFailure);
         }
     }
 
     private String getReqStableHash(PostTransactionRequestPb req) {
         StringBuilder sb = new StringBuilder();
-        sb.append(req.getReferenceId()).append("|")
+        sb.append(req.getWalletTxnRef()).append("|")
                 .append(req.getDescription()).append("|");
         List<LedgerEntryPb> sorted = new ArrayList<>(req.getEntriesList());
         sorted.sort(Comparator.comparing(LedgerEntryPb::getAccountRef)

@@ -9,9 +9,9 @@ public class PbConverter {
             return BalanceSnapshotPb.newBuilder().build();
         }
         return BalanceSnapshotPb.newBuilder()
-                .setWalletId(snapshot.getWalletId())
+                .setWalletRef(snapshot.getWalletRef())
                 .setServiceId(EnumPbMappers.serviceIdPbMapper.from(snapshot.getServiceId()))
-                .setWalletReferenceId(snapshot.getWalletReferenceId())
+                .setWalletBusinessRef(snapshot.getWalletBusinessRef())
                 .setAssetId(snapshot.getAssetId())
                 .setWalletStatus(EnumPbMappers.walletStatusPbMapper.from(snapshot.getWalletStatus()))
                 .setOwnerType(EnumPbMappers.ownerTypePbMapper.from(snapshot.getOwnerType()))

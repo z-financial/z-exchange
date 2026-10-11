@@ -10,9 +10,9 @@ import java.util.List;
 
 public interface WalletReservationMapper extends BaseMapper<WalletReservation> {
     @Insert("<script>" +
-            "INSERT INTO wallet_reservations (reservation_id, initiator, reference_id, wallet_id, wallet_reference_id, asset_id, total, remaining, consumed, pending_settle, reservation_status, reservation_outcome, reserve_txn_id) VALUES " +
+            "INSERT INTO wallet_reservations (internal_id, wallet_reservation_ref, initiator, reference_id, wallet_ref, asset_id, total, remaining, consumed, pending_settle, released, reservation_status, reservation_outcome, reserve_wallet_txn_ref) VALUES " +
             "<foreach collection='list' item='item' separator=','>" +
-            "(#{item.reservationId}, #{item.initiator}, #{item.referenceId}, #{item.walletId}, #{item.walletReferenceId}, #{item.assetId}, #{item.total}, #{item.remaining}, #{item.consumed}, #{item.pendingSettle}, #{item.reservationStatus}, #{item.reservationOutcome}, #{item.reserveTxnId})" +
+            "(#{item.internalId}, #{item.walletReservationRef}, #{item.initiator}, #{item.referenceId}, #{item.walletRef}, #{item.assetId}, #{item.total}, #{item.remaining}, #{item.consumed}, #{item.pendingSettle}, #{item.released}, #{item.reservationStatus}, #{item.reservationOutcome}, #{item.reserveWalletTxnRef})" +
             "</foreach>" +
             "</script>")
     int batchInsert(@Param("list") List<WalletReservation> list);

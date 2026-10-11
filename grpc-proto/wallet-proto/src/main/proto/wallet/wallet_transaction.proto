@@ -18,7 +18,7 @@ message AtomicTransactionRequestPb {
 
 message AtomicTransactionReplyPb {
   common.ErrorPb error = 1;
-  string transaction_id = 2;
+  string wallet_txn_ref = 2;
   TransactionStatusPb status = 3;
 }
 
@@ -32,7 +32,7 @@ message ReserveTransactionRequestPb {
 
 message ReserveTransactionReplyPb {
   common.ErrorPb error = 1;
-  string transaction_id = 2;
+  string wallet_txn_ref = 2;
   TransactionStatusPb status = 3;
   repeated ReservationInfoPb infos = 4;
 }
@@ -47,7 +47,7 @@ message TwoStepTransactionRequestPb {
 
 message TwoStepTransactionReplyPb {
   common.ErrorPb error = 1;
-  string transaction_id = 2;
+  string wallet_txn_ref = 2;
   TransactionStatusPb status = 3;
 }
 
@@ -61,7 +61,7 @@ message ApplyReservationTransactionRequestPb   {
 
 message ApplyReservationTransactionReplyPb {
   common.ErrorPb error = 1;
-  string transaction_id = 2;
+  string wallet_txn_ref = 2;
   TransactionStatusPb status = 3;
 }
 

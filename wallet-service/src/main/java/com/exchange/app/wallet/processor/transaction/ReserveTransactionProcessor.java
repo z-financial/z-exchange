@@ -65,13 +65,13 @@ public class ReserveTransactionProcessor {
         return Result.success();
     }
 
-    private ReserveTransactionReplyPb replySuccess(String txnId, String detail) {
-        List<WalletReservation> reservations = walletReservationRepository.selectByTxnId(txnId);
+    private ReserveTransactionReplyPb replySuccess(String walletTxnRef, String detail) {
+        List<WalletReservation> reservations = walletReservationRepository.selectByWalletTxnRef(walletTxnRef);
         List<ReservationInfoPb> infos = new ArrayList<>();
         for (WalletReservation reservation : reservations) {
             ReservationInfoPb infoPb = ReservationInfoPb.newBuilder()
-                    .setReservationRef(reservation.getReferenceId())
-                    .setWalletRef(reservation.getWalletReferenceId())
+                    .setReservationRef(reservation.getWalletReservationRef())
+                    .setWalletRef(reservation.getWalletRef())
                     .setAssetCode(reservation.getAssetId())
                     .setAmount(reservation.getRemaining()).build();
             infos.add(infoPb);
@@ -79,7 +79,7 @@ public class ReserveTransactionProcessor {
 
         detail = Objects.requireNonNullElse(detail, "");
         return ReserveTransactionReplyPb.newBuilder()
-                .setTransactionId(txnId)
+                .setWalletTxnRef(walletTxnRef)
                 .addAllInfos(infos)
                 .setError(PbErrorBuilder.success(detail))
                 .build();
@@ -89,14 +89,14 @@ public class ReserveTransactionProcessor {
         detail = Objects.requireNonNullElse(detail, "");
         WalletTransaction txn = info.walletTxn;
         ReserveTransactionReplyPb.Builder builder = ReserveTransactionReplyPb.newBuilder()
-                .setTransactionId(txn.getTxnId())
+                .setWalletTxnRef(txn.getWalletTxnRef())
                 .setStatus(EnumPbMappers.transactionStatusPbMapper.from(txn.getTxnStatus()))
                 .setError(PbErrorBuilder.success(detail));
         List<ReservationInfoPb> infos = new ArrayList<>();
         for (WalletReservation reservation : info.reservations) {
             ReservationInfoPb infoPb = ReservationInfoPb.newBuilder()
-                    .setReservationRef(reservation.getReferenceId())
-                    .setWalletRef(reservation.getWalletReferenceId())
+                    .setReservationRef(reservation.getWalletReservationRef())
+                    .setWalletRef(reservation.getWalletRef())
                     .setAssetCode(reservation.getAssetId())
                     .setAmount(reservation.getRemaining()).build();
             infos.add(infoPb);

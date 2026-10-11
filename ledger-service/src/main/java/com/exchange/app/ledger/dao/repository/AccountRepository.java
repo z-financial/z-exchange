@@ -19,15 +19,15 @@ public class AccountRepository extends DbBaseRepository<Account, AccountMapper> 
         super(mapper);
     }
 
-    public List<Account> getAccountIdInRef(List<String> refs) {
+    public List<Account> getByLedgerAccountRefs(List<String> refs) {
         LambdaQueryWrapper<Account> wrapper = new LambdaQueryWrapper<>();
-        wrapper.select(Account::getAccountId, Account::getReferenceId).in(Account::getReferenceId, refs);
+        wrapper.in(Account::getLedgerAccountRef, refs);
         return mapper.selectList(wrapper);
     }
 
-    public Account getByServiceAndReference(ServiceId serviceId, String referenceId) {
+    public Account getByServiceAndWalletRef(ServiceId serviceId, String walletRef) {
         return mapper.selectOne(queryLambdaWrapper()
                 .eq(Account::getServiceId, serviceId)
-                .eq(Account::getReferenceId, referenceId));
+                .eq(Account::getWalletRef, walletRef));
     }
 }

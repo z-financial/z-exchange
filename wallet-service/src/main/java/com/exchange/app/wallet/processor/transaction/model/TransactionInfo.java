@@ -17,20 +17,20 @@ import java.util.Map;
 public class TransactionInfo {
     public final WalletTransaction walletTxn;
     public final List<WalletAction> actions;
-    public final Map<String, List<WalletAction>> walletIdToPostActions; // only CONSUME, TRANSFER_OUT, TRANSFER_IN
+    public final Map<String, List<WalletAction>> walletRefToPostActions; // only CONSUME, TRANSFER_OUT, TRANSFER_IN
     public final List<WalletReservation> reservations;
     public final List<BalanceSnapshot> snapshots;
 
     public static TransactionInfo create(WalletTransaction txn, List<WalletAction> actions, List<WalletReservation> reservations, List<BalanceSnapshot> snapshots) {
-        Map<String, List<WalletAction>> walletIdToActions = new HashMap<>();
+        Map<String, List<WalletAction>> walletRefToActions = new HashMap<>();
         for (WalletAction action : actions) {
             if (!action.isTransfer() && action.getActionType() != ActionType.CONSUME) {
                 continue;
             }
-            walletIdToActions.computeIfAbsent(action.getWalletId(), k -> new ArrayList<>());
-            walletIdToActions.get(action.getWalletId()).add(action);
+            walletRefToActions.computeIfAbsent(action.getWalletRef(), k -> new ArrayList<>());
+            walletRefToActions.get(action.getWalletRef()).add(action);
         }
-        return new TransactionInfo(txn, actions, walletIdToActions, reservations, snapshots);
+        return new TransactionInfo(txn, actions, walletRefToActions, reservations, snapshots);
     }
 
     static TransactionInfo create(WalletTransaction walletTxn) {

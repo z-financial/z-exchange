@@ -54,10 +54,10 @@ public class TransactionValidateHelper {
     }
 
     public static Result<Void> validateActionInfo(List<WalletAction> actions, List<BalanceSnapshot> snapshots, List<WalletReservation> reservations) {
-        Map<String, BalanceSnapshot> walletIdToSnapshot = Objects.requireNonNullElse(snapshots, new ArrayList<BalanceSnapshot>()).stream()
-                .collect(Collectors.toMap(BalanceSnapshot::getWalletId, snapshot -> snapshot));
-        Map<String, WalletReservation> walletIdToReservation = Objects.requireNonNullElse(reservations, new ArrayList<WalletReservation>()).stream()
-                .collect(Collectors.toMap(WalletReservation::getReferenceId, reservation->reservation));
+        Map<String, BalanceSnapshot> walletRefToSnapshot = Objects.requireNonNullElse(snapshots, new ArrayList<BalanceSnapshot>()).stream()
+                .collect(Collectors.toMap(BalanceSnapshot::getWalletRef, snapshot -> snapshot));
+        Map<String, WalletReservation> reservationRefToReservation = Objects.requireNonNullElse(reservations, new ArrayList<WalletReservation>()).stream()
+                .collect(Collectors.toMap(WalletReservation::getWalletReservationRef, reservation -> reservation));
 
         if (actions == null || actions.isEmpty()) {
             log.error("empty actions list");
@@ -71,14 +71,14 @@ public class TransactionValidateHelper {
         }
 
         for (WalletAction action : actions) {
-            BalanceSnapshot snapshot = walletIdToSnapshot.get(action.getWalletId());
+            BalanceSnapshot snapshot = walletRefToSnapshot.get(action.getWalletRef());
             if (!WalletTxnHelper.actionSnapshotMatched(snapshot, action)) {
                 log.error("validate action snapshot mismatch, action: {}, snapshot: {}", action, snapshot);
                 return Result.failure(WalletServiceErrorCode.BALANCE_SNAPSHOT_MISMATCH, "action snapshot mismatch");
             }
 
-            if (!Strings.isEmpty(action.getReservationId())) {
-                WalletReservation reservation = walletIdToReservation.get(action.getReservationId());
+            if (!Strings.isEmpty(action.getWalletReservationRef())) {
+                WalletReservation reservation = reservationRefToReservation.get(action.getWalletReservationRef());
                 if (!WalletTxnHelper.actionReservationMatched(action, reservation)) {
                     log.error("validate action reservation mismatch, action: {}, reservation: {}", action, reservation);
                     return Result.failure(WalletServiceErrorCode.WALLET_RESERVATION_MISMATCH, "action reservation mismatch");
@@ -118,7 +118,7 @@ public class TransactionValidateHelper {
     }
 
     public static Result<Void> validateSnapshotForAction(BalanceSnapshot snapshot, WalletAction action) {
-        if (!Objects.equals(snapshot.getWalletId(), action.getWalletId()) || !Objects.equals(snapshot.getAssetId(), action.getAssetId())) {
+        if (!Objects.equals(snapshot.getWalletRef(), action.getWalletRef()) || !Objects.equals(snapshot.getAssetId(), action.getAssetId())) {
             return Result.failure(WalletServiceErrorCode.BALANCE_SNAPSHOT_MISMATCH,
                     String.format("action snapshot mismatch, snapshot: %s, action: %s", snapshot, action));
         }

@@ -36,10 +36,10 @@ public class OutboxHelper {
         return Outbox.create(
                 OutboxEventType.LEDGER_POST.code,
                 eventId,
-                txn.getTxnId(),
+                txn.getWalletTxnRef(),
                 OutboxStatus.PENDING,
                 WalletTopic.POST_LEDGER,
-                txn.getTxnId(),
+                txn.getWalletTxnRef(),
                 requestPb.toByteArray(),
                 0,
                 LocalDateTime.now(),

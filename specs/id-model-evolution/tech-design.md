@@ -34,7 +34,7 @@ The following remain outside this phase:
 - BalanceSnapshot identity redesign or a `balance_ref`;
 - diagnostic decoding of generator time, worker, or sequence fields;
 - reference-format version and generator-version fields;
-- routing, sharding, buckets, and physical partition metadata; and
+- physical shard topology, logical-bucket migration mechanics, and distributed transaction design; and
 - generated numeric values above `Long.MAX_VALUE`.
 
 ## 2. Identity contracts
@@ -52,9 +52,10 @@ insert. MyBatis uses an assigned ID rather than `AUTO_INCREMENT`; Java uses
 `Long` while values remain in `1..Long.MAX_VALUE`.
 
 `internal_id` is valid for owner-table persistence and direct owner-table
-lookup. It must not be exposed by APIs or messages or used as another owner's
-persisted relationship. Business logic must not infer ordering, time, worker,
-or sequence from it.
+lookup after the correct partition has already been selected. It must not be
+exposed by APIs or messages or used as another owner's persisted relationship.
+Business logic must not infer ordering, time, worker, sequence, or storage
+location from it.
 
 The database type intentionally leaves room for a future unsigned generator.
 Using values above `Long.MAX_VALUE` requires a separate Java/JDBC mapping
@@ -66,27 +67,34 @@ Each covered domain entity stores one non-null, unique typed reference. The
 conceptual format is:
 
 ```text
-<TYPE>-<ENC_INTERNAL_ID>-<CHK>
+<TYPE>-<BUCKET>-<ENC_INTERNAL_ID>-<CHK>
 ```
 
 The reference is generated locally and deterministically from the entity type
-and `internal_id`. It contains no environment, generator version, service
-domain, worker, bucket, partition, or storage location.
+and `internal_id` after its logical bucket has been selected. `BUCKET` is an
+immutable virtual routing bucket, not a physical database or table number. A
+routing map resolves the bucket to its current physical partition; resharding
+moves the bucket mapping without rewriting issued references. The reference
+contains no environment, generator version, service domain, worker, or
+physical storage location.
 
 The type registry must distinguish every covered domain entity. Equal numeric
 IDs from different generator domains therefore remain different references.
 
-The permanent format is fixed as follows:
+The format is fixed as follows, subject to the remaining logical-bucket width
+decision:
 
 - type codes are the three-character values in the registry below;
+- `BUCKET` is the canonical, fixed-width Base62 encoding of the entity's
+  logical bucket;
 - `ENC_INTERNAL_ID` is the canonical case-sensitive Base62 representation,
   using `0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz` and
   left-padded with `0` to exactly 11 characters;
 - `CHK` is the six-character, zero-padded Base62 encoding of the
-  CRC32C of the ASCII payload `<TYPE>-<ENC_INTERNAL_ID>`;
-- every entity reference is exactly 22 characters;
-- reference columns use the ASCII character set and a binary collation so
-  Base62 letter case remains significant; and
+  CRC32C of the ASCII payload `<TYPE>-<BUCKET>-<ENC_INTERNAL_ID>`;
+- every entity reference is exactly `23 + BUCKET_WIDTH` characters;
+- reference columns use `utf8mb4` with `utf8mb4_bin` collation so Base62
+  letter case remains significant without restricting the table to ASCII; and
 - only numeric values in `1..Long.MAX_VALUE` are valid.
 
 | Entity | Type code | Allocator domain |
@@ -113,13 +121,56 @@ Typed entity references are canonical identities for:
 - reconciliation and analytical exports; and
 - persisted relationships to covered entities.
 
-They are opaque to business code. Only the shared codec may parse them.
+They are opaque to business code. Only shared identity and routing
+infrastructure may parse them.
 
 `event_ref` follows a separate message-identity contract. It is immutable,
 opaque, and unique in an outbox, but it is not required to decode to that
 outbox row's `internal_id`.
 
-### 2.3 Caller-owned references and idempotency
+### 2.3 Why persisted relationships use references
+
+Persisted relationships use the target entity's typed reference even when the
+source and target currently belong to the same service. The alternative,
+storing another owner's `internal_id`, creates several long-term problems:
+
+- an internal ID identifies a row only after the owning partition is known;
+- generator-domain uniqueness is not a permanent storage-routing contract;
+- a numeric value alone does not prove the expected target entity type;
+- related tables may later use different partitioning or placement rules; and
+- internal-ID relationships create a second identity form that can leak into
+  caches, messages, logs, and service boundaries.
+
+A typed reference carries the target type and immutable logical bucket. The
+router can therefore select the current physical partition before performing
+the owner-table lookup, and the relationship survives movement of that bucket
+without rewriting referencing rows. Using the same relationship form in
+persistence and at boundaries also removes conversions and ambiguity during
+reconciliation and migration. The resulting wider relationship columns and
+indexes are an accepted tradeoff.
+
+For example, `wallet_actions.wallet_txn_ref` can route to the owning Wallet
+transaction and `wallet_actions.wallet_ref` can independently route to the
+affected Wallet. The bucket in `wallet_action_ref` identifies the action row's
+own placement. These values make routing deterministic, but they do not make a
+multi-wallet transaction atomic across physical shards; transaction
+coordination remains a separate design concern.
+
+### 2.4 Logical-bucket rules
+
+Each entity receives one logical bucket at creation according to its owner's
+placement rule. The bucket never changes. Physical databases and tables may be
+added, removed, or rebalanced by changing the routing map from logical buckets
+to physical partitions. Business code neither calculates physical locations
+from the bucket nor parses references; it supplies the complete reference to
+shared routing infrastructure.
+
+The final bucket count and encoding width must provide sufficient virtual
+buckets for future rebalancing and must not be derived from the current number
+of physical shards. Checksum validation covers the bucket so a mistyped bucket
+cannot silently route an otherwise valid identifier to the wrong partition.
+
+### 2.5 Caller-owned references and idempotency
 
 Caller-provided business references and idempotency keys are not entity
 identity and remain separate. A field currently named `reference_id` must be
@@ -138,16 +189,16 @@ reference.
 
 ```java
 interface EntityRefCodec {
-    String encode(EntityRefType type, long internalId);
+    String encode(EntityRefType type, int logicalBucket, long internalId);
     DecodedEntityRef decode(String value);
 }
 
-record DecodedEntityRef(EntityRefType type, long internalId) {}
+record DecodedEntityRef(EntityRefType type, int logicalBucket, long internalId) {}
 
 record GeneratedEntityIdentity(long internalId, String reference) {}
 
 interface EntityIdentityFactory {
-    GeneratedEntityIdentity next(EntityRefType type);
+    GeneratedEntityIdentity next(EntityRefType type, int logicalBucket);
 }
 
 interface EventRefFactory {
@@ -159,15 +210,18 @@ interface EventRefFactory {
 The codec shall:
 
 - accept generated values only in `1..Long.MAX_VALUE`;
-- emit one canonical uppercase representation;
-- reject malformed, non-canonical, unknown-type, and checksum-invalid input;
-- round-trip the entity type and `internal_id` without precision loss; and
+- emit one canonical, case-sensitive Base62 representation;
+- reject malformed, non-canonical, unknown-type, out-of-range-bucket, and
+  checksum-invalid input;
+- round-trip the entity type, logical bucket, and `internal_id` without
+  precision loss; and
 - operate without database or network access.
 
 Validation uses the controlled `entity_reference` error namespace with the
-codes `MALFORMED`, `UNKNOWN_TYPE`, `CHECKSUM_INVALID`, `OVER_LENGTH`,
-`OUT_OF_RANGE`, and `UNEXPECTED_TYPE`. Callers that expect a specific entity
-must use expected-type decoding rather than decode and route on their own.
+codes `MALFORMED`, `UNKNOWN_TYPE`, `BUCKET_OUT_OF_RANGE`, `CHECKSUM_INVALID`,
+`OVER_LENGTH`, `OUT_OF_RANGE`, and `UNEXPECTED_TYPE`. Callers that expect a
+specific entity must use expected-type decoding rather than decode and route
+on their own.
 
 The type registry is an identity protocol registry, not a place for Wallet or
 Ledger business rules. The codec must not route requests, authorize access, or
@@ -177,9 +231,10 @@ reply outcome.
 
 The existing managed `z-id-generator` bean remains the only source of new
 `internal_id` values. `EntityIdentityFactory` allocates and encodes one
-immutable pair so the row key and reference cannot diverge. The caller invokes
-the factory before its database transaction; both values are then committed in
-the same transaction as the entity and any required outbox row.
+immutable pair for a bucket selected by routing infrastructure so the row key
+and reference cannot diverge. The caller invokes the factory before its
+database transaction; both values are then committed in the same transaction
+as the entity and any required outbox row.
 
 ## 4. Schema cutover
 
@@ -224,9 +279,9 @@ only a duplicate lookup for the current Wallet entity, it is removed in favor
 of `wallet_ref`; if a verified caller-owned use remains, it must be renamed to
 an explicit business-reference name before implementation.
 
-The same classification applies to
-`wallet_reservations.wallet_reference_id`: it must not survive as an ambiguous
-second Wallet identity.
+`wallet_reservations.wallet_reference_id` is removed because `wallet_ref`
+already identifies the reservation's Wallet; the reservation does not require
+a denormalized copy of the Wallet's caller-owned business reference.
 
 ### 4.3 Ledger relationships
 
@@ -244,7 +299,7 @@ If accounts later support multiple owner services, the contract needs an
 explicit typed source reference rather than a generic `reference_id`.
 
 There are no foreign keys across service databases. Full typed references are
-the authoritative cross-service relationship.
+the authoritative relationship both within a service and across services.
 
 ### 4.4 Indexes and assigned IDs
 
@@ -358,9 +413,11 @@ commit with business state, and Redis/DB idempotency behavior is preserved.
 ## 8. ID opacity
 
 Diagnostic decoding of generator time, worker, and sequence fields is deferred.
-Business modules must not decode generated IDs or use their values for routing,
-ordering, validation, authorization, uniqueness, or another correctness
-decision. The reference codec is the only supported parser for `*_ref` values.
+Business modules must not decode generated IDs or references or use their
+values for routing, ordering, validation, authorization, uniqueness, or
+another correctness decision. Shared identity and routing infrastructure is
+the only supported parser for `*_ref` values and may use the logical bucket
+solely to select the current physical partition.
 
 No generator-version bits are introduced. The configured generator layout and
 epoch remain immutable for issued IDs, and the dependency version remains
@@ -372,8 +429,9 @@ pinned as required by the generator integration SPEC.
   writes. No fallback generator is permitted.
 - Reference encoding or validation failure aborts the write before any partial
   mutation or completed idempotency result is committed.
-- Malformed, unknown-type, and checksum-invalid references produce controlled
-  validation or not-found results; services do not guess an entity type.
+- Malformed, unknown-type, out-of-range-bucket, and checksum-invalid references
+  produce controlled validation or not-found results; services do not guess an
+  entity type or physical partition.
 - Duplicate internal IDs or references roll back the transaction and trigger a
   high-severity signal.
 - Clock rollback, sequence exhaustion, dedicated-pool lifecycle, metrics, and
@@ -383,8 +441,9 @@ pinned as required by the generator integration SPEC.
 
 ## 10. Implementation sequence
 
-1. Finalize the reference registry, encoding, checksum, length, and controlled
-   error contract.
+1. Finalize logical-bucket cardinality and assignment rules, then finalize the
+   reference registry, encoding width, checksum, length, and controlled error
+   contract.
 2. Add the generic codec and MySQL/MyBatis numeric-contract tests.
 3. Change standard Wallet and Ledger schemas to assigned `internal_id` keys,
    typed references, renamed relationships, and updated indexes.
@@ -401,9 +460,10 @@ organization, not for mixed-version deployment.
 
 ## 11. Remaining event-task decisions
 
-The entity-reference registry, encoding, checksum, length, controlled errors,
-and schema/protobuf rename matrix are fixed by this design and its linked
-matrix. The event/outbox task still owns:
+The entity-reference registry and schema/protobuf rename matrix are fixed by
+this design and its linked matrix. Logical-bucket cardinality, assignment,
+encoding width, resulting reference length, and routing-map ownership remain
+entity-reference decisions. The event/outbox task still owns:
 
 1. distinct Wallet-request and Ledger-reply event namespaces;
 2. deterministic Ledger reply-reference encoding and canonical outcomes; and

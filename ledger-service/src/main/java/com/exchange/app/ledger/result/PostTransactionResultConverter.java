@@ -14,8 +14,8 @@ public final class PostTransactionResultConverter {
         }
 
         PostTransactionReplyPb.Builder builder = PostTransactionReplyPb.newBuilder();
-        if (ValidateHelper.hasText(result.referenceId())) {
-            builder.setReferenceId(result.referenceId());
+        if (ValidateHelper.hasText(result.walletTxnRef())) {
+            builder.setWalletTxnRef(result.walletTxnRef());
         }
         if (ValidateHelper.hasText(result.ledgerTxnId())) {
             builder.setLedgerTxnId(result.ledgerTxnId());

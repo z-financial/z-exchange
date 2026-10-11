@@ -9,6 +9,8 @@ import com.exchange.app.wallet.result.WalletServiceErrorCode;
 import com.exchange.common.exception.AbnormalProtoDataException;
 import com.exchange.common.exception.CustomizedException;
 import com.exchange.common.kafka.listener.exception.KafkaListenerRetriableException;
+import com.exchange.common.identity.EntityRefCodec;
+import com.exchange.common.identity.EntityRefType;
 import com.exchange.common.result.Result;
 import com.exchange.common.result.error.ErrorCode;
 import com.exchange.common.result.error.RetryableErrorCode;
@@ -28,6 +30,7 @@ import java.util.function.Consumer;
 public class WalletLedgerReplyMessageHandler implements Consumer<EventEnvelopePb> {
     private final AfterPostLedgerProcessor afterPostLedgerProcessor;
     private final WalletBusinessMetrics walletBusinessMetrics;
+    private final EntityRefCodec entityRefCodec;
 
     @Override
     public void accept(EventEnvelopePb envelope) {
@@ -79,11 +82,19 @@ public class WalletLedgerReplyMessageHandler implements Consumer<EventEnvelopePb
                             + ", detail=" + reply.getError().getDetail()
             );
         }
-        if (reply.getReferenceId().isBlank() || reply.getLedgerTxnId().isBlank()) {
+        if (reply.getWalletTxnRef().isBlank() || reply.getLedgerTxnId().isBlank()) {
             throw new AbnormalProtoDataException(
                     WalletServiceErrorCode.SERIALIZE_ERROR,
                     "successful post ledger reply is missing transaction identity"
             );
+        }
+        // Reply correlation is a typed boundary value; validation never exposes or uses
+        // the decoded internal storage ID.
+        Result<Void> referenceValidation =
+                entityRefCodec.validate(reply.getWalletTxnRef(), EntityRefType.WALLET_TRANSACTION);
+        if (referenceValidation.isFailed()) {
+            throw classifyProcessingFailure(
+                    referenceValidation.getErrorCode(), referenceValidation.getDetail(), null);
         }
 
         Result<WalletTransaction> result;
@@ -91,7 +102,7 @@ public class WalletLedgerReplyMessageHandler implements Consumer<EventEnvelopePb
             result = walletBusinessMetrics.recordResult(
                     WalletMetricTagValues.Operations.COMPLETE_LEDGER_TRANSACTION,
                     WalletMetricTagValues.Ingress.KAFKA,
-                    () -> afterPostLedgerProcessor.afterPostLedger(reply.getReferenceId())
+                    () -> afterPostLedgerProcessor.afterPostLedger(reply.getWalletTxnRef())
             );
         } catch (CustomizedException e) {
             throw classifyProcessingFailure(e.getErrorCode(), e.getMessage(), e);

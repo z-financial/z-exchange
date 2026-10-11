@@ -8,13 +8,13 @@ option java_package = "com.exchange.proto.wallet.wallet";
 import "wallet/wallet_enum.proto";
 import "com/exchange/proto/common/error.proto";
 
-message GetSnapshotByIdRequestPb {
-  string walletId = 1;     // maps to ledger_transactions.txn_id
+message GetSnapshotByWalletRefRequestPb {
+  string wallet_ref = 1;
 }
 
-message GetSnapshotByRefIdRequestPb {
-  string referenceId = 1;     // maps to ledger_transactions.reference_id
-  ServiceIdPb serviceId = 2;
+message GetSnapshotByBusinessRefRequestPb {
+  string wallet_business_ref = 1;
+  ServiceIdPb service_id = 2;
 }
 
 message GetSnapshotReplyPb {
@@ -23,13 +23,13 @@ message GetSnapshotReplyPb {
 }
 
 message BalanceSnapshotPb {
-  string walletId = 1;
-  ServiceIdPb serviceId = 2;
-  string walletReferenceId = 3;
-  string assetId = 4;
-  WalletStatusPb walletStatus = 5;
-  OwnerTypePb ownerType = 6;
-  string ownerId = 7;
+  string wallet_ref = 1;
+  ServiceIdPb service_id = 2;
+  string wallet_business_ref = 3;
+  string asset_id = 4;
+  WalletStatusPb wallet_status = 5;
+  OwnerTypePb owner_type = 6;
+  string owner_id = 7;
   int64 available = 8;
   int64 reserved = 9;
 }

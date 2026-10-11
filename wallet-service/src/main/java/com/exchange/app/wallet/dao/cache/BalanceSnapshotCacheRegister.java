@@ -38,7 +38,7 @@ public class BalanceSnapshotCacheRegister {
             StrategyFactory factory,
             CacheTtlConfig config,
             MeterRegistry meterRegistry) {
-        CacheDescriptor<String> descriptor = new CacheDescriptor<>(String.class, CacheScope::balanceSnapshotRefIdKey);
+        CacheDescriptor<String> descriptor = new CacheDescriptor<>(String.class, CacheScope::balanceSnapshotBusinessRefKey);
         var ttlConfig = new RawStrategyConfig.TtlConfig(
                 config.getDefaultRefStrategy(),
                 config.getNegativeStrategy(),
@@ -65,7 +65,7 @@ public class BalanceSnapshotCacheRegister {
             StrategyFactory factory,
             CacheTtlConfig config,
             MeterRegistry meterRegistry) {
-        CacheDescriptor<String> descriptor = new CacheDescriptor<>(String.class, CacheScope::balanceSnapshotRefIdKey);
+        CacheDescriptor<String> descriptor = new CacheDescriptor<>(String.class, CacheScope::balanceSnapshotBusinessRefKey);
         var ttlConfig = new RawStrategyConfig.TtlConfig(
                 config.getDefaultRefStrategy(),
                 config.getNegativeStrategy(),
@@ -92,7 +92,7 @@ public class BalanceSnapshotCacheRegister {
             StrategyFactory factory,
             CacheTtlConfig config,
             MeterRegistry meterRegistry) {
-        CacheDescriptor<BalanceSnapshot> descriptor = new CacheDescriptor<>(BalanceSnapshot.class, CacheScope::balanceSnapshotIdKey);
+        CacheDescriptor<BalanceSnapshot> descriptor = new CacheDescriptor<>(BalanceSnapshot.class, CacheScope::balanceSnapshotWalletRefKey);
         SelfRecoverFeature recoverFeature = new RawDeleteSelfRecoverFeature(cacheDeleter);
         var ttlConfig = new VersionStrategyConfig.TtlConfig(
                 config.getDefaultEntityStrategy(),
@@ -117,7 +117,7 @@ public class BalanceSnapshotCacheRegister {
             StrategyFactory factory,
             CacheTtlConfig config,
             MeterRegistry meterRegistry) {
-        CacheDescriptor<BalanceSnapshot> descriptor = new CacheDescriptor<>(BalanceSnapshot.class, CacheScope::balanceSnapshotIdKey);
+        CacheDescriptor<BalanceSnapshot> descriptor = new CacheDescriptor<>(BalanceSnapshot.class, CacheScope::balanceSnapshotWalletRefKey);
         SelfRecoverFeature recoverFeature = new RawDeleteSelfRecoverFeature(cacheDeleter);
         // enable negative cache for hot snapshot
         NegativeCacheFeature negativeCacheFeature = new DefaultNegativeCacheFeature(cacheWriter, cacheDeleter);

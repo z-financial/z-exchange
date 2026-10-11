@@ -14,11 +14,10 @@ import lombok.NoArgsConstructor;
 public class WalletAccountMapping {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private String walletId;
-    // now the ref id is wallet_id, because wallet to account is 1:1 mapping
-    private String accountRefId;
+    private String walletRef;
+    private String ledgerAccountRef;
 
-    public static WalletAccountMapping create(String walletId, String accountRefId) {
-        return new WalletAccountMapping(0L, walletId, accountRefId);
+    public static WalletAccountMapping create(String walletRef, String ledgerAccountRef) {
+        return new WalletAccountMapping(0L, walletRef, ledgerAccountRef);
     }
 }

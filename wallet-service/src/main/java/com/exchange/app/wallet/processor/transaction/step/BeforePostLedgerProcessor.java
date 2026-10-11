@@ -21,6 +21,10 @@ import com.exchange.app.wallet.result.WalletServiceErrorCode;
 import com.exchange.app.wallet.utils.*;
 import com.exchange.common.constant.GlobalServiceId;
 import com.exchange.common.db.utils.DbTxnExecutor;
+import com.exchange.common.identity.EntityIdentityFactory;
+import com.exchange.common.identity.EntityRefCodec;
+import com.exchange.common.identity.EntityRefType;
+import com.exchange.common.identity.GeneratedEntityIdentity;
 import com.exchange.common.idgen.InternalIdGenerator;
 import com.exchange.common.kafka.producer.IPublisher;
 import com.exchange.common.outbox.dao.repository.OutboxRepository;
@@ -61,6 +65,9 @@ public class BeforePostLedgerProcessor {
     private final IPublisher postLedgerPublisher;
     private final UpdateReservationProcessor updateReservationProcessor;
     private final UpdateBalanceSnapshotProcessor updateBalanceSnapshotProcessor;
+    private final EntityIdentityFactory entityIdentityFactory;
+    private final EntityRefCodec entityRefCodec;
+    // Event identity remains on the phase-one contract until the outbox identity task.
     private final InternalIdGenerator internalIdGenerator;
 
     // reserve -> snapshot: -available, +reserved
@@ -82,6 +89,10 @@ public class BeforePostLedgerProcessor {
     }
 
     private Result<TransactionInfo> doBeforePostingLedger(RequestInfo requestInfo, boolean needPostLedger) {
+        Result<Void> identityValidation = validateEntityReferences(requestInfo.linePbs);
+        if (identityValidation.isFailed()) {
+            return Result.failure(identityValidation);
+        }
         WalletTransaction walletTxn = createTxn(requestInfo);
 
         // complete txn immediately if no need to post ledger
@@ -94,7 +105,8 @@ public class BeforePostLedgerProcessor {
                 .map(TransactionLinePb::getWalletRef)
                 .collect(Collectors.toSet());
         List<BalanceSnapshot> balanceSnapshots = balanceSnapshotManager.selectByRefs(walletTxn.getInitiator(), new ArrayList<>(walletRefs));
-        Map<String, BalanceSnapshot> walletRefToSnapshot = balanceSnapshots.stream().collect(Collectors.toMap(BalanceSnapshot::getWalletReferenceId, snapshot -> snapshot));
+        Map<String, BalanceSnapshot> walletRefToSnapshot = balanceSnapshots.stream()
+                .collect(Collectors.toMap(BalanceSnapshot::getWalletRef, snapshot -> snapshot));
 
         // get reservation from db
         Set<String> reservationRefs = requestInfo.linePbs.stream()
@@ -108,7 +120,8 @@ public class BeforePostLedgerProcessor {
                 return Result.failure(WalletServiceErrorCode.WALLET_RESERVATION_NOT_FOUND, "reservations not found");
             }
         }
-        Map<String, WalletReservation> refToReservation = reservationsInRequest.stream().collect(Collectors.toMap(WalletReservation::getReferenceId, reservation->reservation));
+        Map<String, WalletReservation> refToReservation = reservationsInRequest.stream()
+                .collect(Collectors.toMap(WalletReservation::getWalletReservationRef, reservation -> reservation));
 
         // create action and reservation
         List<WalletAction> actions = new ArrayList<>();
@@ -124,9 +137,11 @@ public class BeforePostLedgerProcessor {
             switch (line.getOperationType()) {
                 case OperationTypePb_Reserve:
                 case OperationTypePb_Debit:
-                    reservation = ObjectBuilder.createReservation(nextInternalId(), walletTxn, snapshot.getWalletId(), line);
+                    reservation = ObjectBuilder.createReservation(
+                            entityIdentityFactory.next(EntityRefType.WALLET_RESERVATION),
+                            walletTxn, snapshot.getWalletRef(), line);
                     createdReservations.add(reservation);
-                    refToReservation.put(reservation.getReferenceId(), reservation);
+                    refToReservation.put(reservation.getWalletReservationRef(), reservation);
                     break;
                 case OperationTypePb_Earmark:
                 case OperationTypePb_Release:
@@ -137,17 +152,18 @@ public class BeforePostLedgerProcessor {
                     }
             }
 
-            String reservationId = null;
+            String reservationRef = null;
             if (reservation != null) {
-                reservationId = reservation.getReferenceId();
+                reservationRef = reservation.getWalletReservationRef();
             }
             int actionCount = ObjectBuilder.requiredActionCount(line);
-            List<String> actionIds = new ArrayList<>(actionCount);
+            List<GeneratedEntityIdentity> actionIdentities = new ArrayList<>(actionCount);
             for (int i = 0; i < actionCount; i++) {
-                actionIds.add(nextInternalId());
+                actionIdentities.add(entityIdentityFactory.next(EntityRefType.WALLET_ACTION));
             }
             List<WalletAction> actionsFromLine = ObjectBuilder.createActionsFromLine(
-                    walletTxn.getTxnId(), snapshot.getWalletId(), reservationId, line, actionIds);
+                    walletTxn.getWalletTxnRef(), snapshot.getWalletRef(), reservationRef, line,
+                    actionIdentities);
             actions.addAll(actionsFromLine);
         }
 
@@ -176,7 +192,8 @@ public class BeforePostLedgerProcessor {
         // set idemp to DONE when found wallet txn
         Result<Void> markDoneResult = idempotencyClient.markIdempDone(
                 GlobalServiceId.WALLET.code, Constant.SCOPE, requestInfo.idempotenceKey,
-                String.valueOf(requestInfo.getStableHash()), requestInfo.token, walletTxn.getTxnId(), idempConfig.getDoneTtl());
+                String.valueOf(requestInfo.getStableHash()), requestInfo.token,
+                walletTxn.getWalletTxnRef(), idempConfig.getDoneTtl());
         if (markDoneResult.isFailed()) {
             // The wallet DB commit is authoritative; Redis refresh remains best effort.
             log.warn("mark wallet idempotency done failed after DB commit, result={}", markDoneResult);
@@ -209,34 +226,51 @@ public class BeforePostLedgerProcessor {
         BusinessType businessType = EnumPbMappers.businessTypePbMapper.to(requestInfo.businessTypePb);
 
         // The generator call is deliberately outside updateDbToCreateTxn's transaction callback.
-        return ObjectBuilder.createTransaction(nextInternalId(), requestInfo.transactionType,
+        return ObjectBuilder.createTransaction(
+                entityIdentityFactory.next(EntityRefType.WALLET_TRANSACTION), requestInfo.transactionType,
                 requestInfo.referenceId, serviceId, requestInfo.idempotenceKey, businessType);
     }
 
-    private String nextInternalId() {
-        return Long.toString(internalIdGenerator.nextId());
+    private Result<Void> validateEntityReferences(List<TransactionLinePb> lines) {
+        for (TransactionLinePb line : lines) {
+            Result<Void> referenceValidation =
+                    entityRefCodec.validate(line.getWalletRef(), EntityRefType.WALLET);
+            if (referenceValidation.isFailed()) {
+                return Result.failure(WalletServiceErrorCode.INVALID_REQUEST_PARAMETER,
+                        referenceValidation.getDetail());
+            }
+            if (!Strings.isEmpty(line.getReservationRef())) {
+                referenceValidation = entityRefCodec.validate(
+                        line.getReservationRef(), EntityRefType.WALLET_RESERVATION);
+                if (referenceValidation.isFailed()) {
+                    return Result.failure(WalletServiceErrorCode.INVALID_REQUEST_PARAMETER,
+                            referenceValidation.getDetail());
+                }
+            }
+        }
+        return Result.success();
     }
 
     private Result<List<BalanceSnapshot>> updateDbToCreateTxn(WalletTransaction walletTxn, List<WalletAction> actions, List<BalanceSnapshot> balanceSnapshots,
                                                               List<WalletReservation> reservationsInRequest, List<WalletReservation> createdReservations, Outbox outbox) {
 
-        Map<String, List<WalletAction>> walletIdToActions = new HashMap<>();
+        Map<String, List<WalletAction>> walletRefToActions = new HashMap<>();
         for (WalletAction action : actions) {
-            walletIdToActions.computeIfAbsent(action.getWalletId(), k -> new ArrayList<>());
-            walletIdToActions.get(action.getWalletId()).add(action);
+            walletRefToActions.computeIfAbsent(action.getWalletRef(), k -> new ArrayList<>());
+            walletRefToActions.get(action.getWalletRef()).add(action);
         }
 
         // immediately claim the outbox and attempt to publish it right after update db
         return dbTxnExecutor.executeWithDefault(() -> {
             Result<Void> reservationResult = updateReservationProcessor.updateReservations(reservationsInRequest,
-                    (reservation) -> updateReservationBeforePosting(reservation, walletIdToActions));
+                    (reservation) -> updateReservationBeforePosting(reservation, walletRefToActions));
             if (reservationResult.isFailed()) {
                 log.error("update reservations failed, {}, {}", reservationResult, reservationsInRequest);
                 return Result.failure(reservationResult);
             }
 
 
-            Result<List<BalanceSnapshot>> snapshotResult = updateSnapshotsBeforePosting(walletIdToActions, balanceSnapshots);
+            Result<List<BalanceSnapshot>> snapshotResult = updateSnapshotsBeforePosting(walletRefToActions, balanceSnapshots);
             if (snapshotResult.isFailed()) {
                 log.error("update snapshots failed, {}, {}", snapshotResult, balanceSnapshots);
                 return Result.failure(snapshotResult);
@@ -274,8 +308,8 @@ public class BeforePostLedgerProcessor {
         });
     }
 
-    private Result<WalletReservation> updateReservationBeforePosting(WalletReservation reservation, Map<String, List<WalletAction>> walletIdToActions) {
-        for (WalletAction action : walletIdToActions.get(reservation.getWalletId())) {
+    private Result<WalletReservation> updateReservationBeforePosting(WalletReservation reservation, Map<String, List<WalletAction>> walletRefToActions) {
+        for (WalletAction action : walletRefToActions.get(reservation.getWalletRef())) {
             switch (action.getActionType()) {
                 case CONSUME:
                     if (reservation.getRemaining() < action.getAmount()) {
@@ -300,14 +334,15 @@ public class BeforePostLedgerProcessor {
         return Result.success(reservation);
     }
 
-    private Result<List<BalanceSnapshot>> updateSnapshotsBeforePosting(Map<String, List<WalletAction>> walletIdToActions, List<BalanceSnapshot> snapshots) {
+    private Result<List<BalanceSnapshot>> updateSnapshotsBeforePosting(Map<String, List<WalletAction>> walletRefToActions, List<BalanceSnapshot> snapshots) {
         List<BalanceSnapshot> snapshotInOrder = snapshots.stream().sorted(Comparator.comparing(BalanceSnapshot::getId)).collect(Collectors.toList());
         return updateBalanceSnapshotProcessor.updateSnapshots(snapshotInOrder,
-                (snapshot) -> doUpdateSnapshotBeforePosting(snapshot, walletIdToActions));
+                (snapshot) -> doUpdateSnapshotBeforePosting(snapshot, walletRefToActions));
     }
 
-    private Result<BalanceSnapshot> doUpdateSnapshotBeforePosting(BalanceSnapshot snapshot, Map<String, List<WalletAction>> walletIdToActions) {
-        for (WalletAction action : walletIdToActions.getOrDefault(snapshot.getWalletId(), Collections.emptyList())) {
+    private Result<BalanceSnapshot> doUpdateSnapshotBeforePosting(BalanceSnapshot snapshot, Map<String, List<WalletAction>> walletRefToActions) {
+        for (WalletAction action : walletRefToActions.getOrDefault(snapshot.getWalletRef(), Collections.emptyList())) {
+            snapshot.setLastWalletTxnRef(action.getWalletTxnRef());
             switch (action.getActionType()) {
                 case RESERVE:
                     Result<Void> reserveValidateResult = TransactionValidateHelper.validateSnapshotForAction(snapshot, action);
@@ -350,18 +385,18 @@ public class BeforePostLedgerProcessor {
             List<WalletAction> transferActions = actions.stream()
                     .filter((action) -> action.getActionType() == ActionType.TRANSFER_IN || action.getActionType() == ActionType.TRANSFER_OUT).toList();
 
-            List<String> walletIds = actions.stream()
-                    .map(WalletAction::getWalletId)
+            List<String> walletRefs = actions.stream()
+                    .map(WalletAction::getWalletRef)
                     .distinct()
                     .collect(Collectors.toList());
-            List<WalletAccountMapping> mappings = walletAccountMappingManager.selectInWalletIds(walletIds);
-            if (mappings.size() != walletIds.size()) {
-                log.error("wallet_account_mapping_not_found, wallet_ids: {}, mappings: {}", walletIds, mappings);
+            List<WalletAccountMapping> mappings = walletAccountMappingManager.selectInWalletRefs(walletRefs);
+            if (mappings.size() != walletRefs.size()) {
+                log.error("wallet_account_mapping_not_found, wallet_refs: {}", walletRefs);
                 return Result.failure(WalletServiceErrorCode.WALLET_ACCOUNT_MAPPING_NOT_FOUND, "wallet_account_mapping_not_found");
             }
             // Allocate once before the business transaction. The same persisted event ID is then
             // reused by immediate publication and every outbox retry.
-            String eventId = nextInternalId();
+            String eventId = Long.toString(internalIdGenerator.nextId());
             Result<Outbox> outboxResult = ObjectBuilder.createOutbox(eventId, walletTxn, actions, mappings);
             if (outboxResult.isFailed()) {
                 log.error("createOutbox failed: {}", outboxResult);

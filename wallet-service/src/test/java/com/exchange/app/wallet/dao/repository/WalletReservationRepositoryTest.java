@@ -47,6 +47,6 @@ class WalletReservationRepositoryTest {
         verify(mapper).selectList(wrapperCaptor.capture());
         String sql = wrapperCaptor.getValue().getSqlSegment().replaceAll("\\s+", " ").toLowerCase();
         assertTrue(sql.contains("initiator ="));
-        assertTrue(sql.contains("reference_id in"));
+        assertTrue(sql.contains("wallet_reservation_ref in"));
     }
 }

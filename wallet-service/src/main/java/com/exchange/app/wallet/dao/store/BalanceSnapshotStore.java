@@ -42,48 +42,53 @@ public class BalanceSnapshotStore {
     }
 
     public void postInsert(BalanceSnapshot balanceSnapshot) {
-        postInsert(balanceSnapshot.getWalletId(), balanceSnapshot.getServiceId(), balanceSnapshot.getWalletReferenceId(), balanceSnapshot.getOwnerType());
+        postInsert(balanceSnapshot.getWalletRef(), balanceSnapshot.getServiceId(),
+                balanceSnapshot.getWalletBusinessRef(), balanceSnapshot.getOwnerType());
 
-        Result<Boolean> result = determineBalanceStrategy(balanceSnapshot.getWalletId()).afterInsert(balanceSnapshot.getWalletId(), balanceSnapshot, balanceSnapshot.getVersion());
+        Result<Boolean> result = determineBalanceStrategy(balanceSnapshot.getWalletRef())
+                .afterInsert(balanceSnapshot.getWalletRef(), balanceSnapshot, balanceSnapshot.getVersion());
         if (!result.isSuccess()) {
             log.error("after_insert, cache strategy failed: {}, snapshot: {}", result, balanceSnapshot);
         }
     }
 
-    public void postInsert(String walletId, ServiceId serviceId, String refId, OwnerType ownerType) {
-        String scopedRefId = buildRefCacheId(serviceId, refId);
-        promoteHotSnapshot(walletId, scopedRefId, ownerType);
+    public void postInsert(String walletRef, ServiceId serviceId, String businessRef, OwnerType ownerType) {
+        String scopedBusinessRef = buildBusinessRefCacheId(serviceId, businessRef);
+        promoteHotSnapshot(walletRef, scopedBusinessRef, ownerType);
 
-        Result<Boolean> refResult = determineRefStrategy(scopedRefId).afterInsert(scopedRefId, walletId);
+        Result<Boolean> refResult = determineRefStrategy(scopedBusinessRef)
+                .afterInsert(scopedBusinessRef, walletRef);
         if (!refResult.isSuccess()) {
-            log.error("clean negative cache failed, serviceId: {}, ref_id: {}, refResult: {}", serviceId, refId, refResult);
+            log.error("clean negative cache failed, service_id={}, wallet_business_ref={}, result={}",
+                    serviceId, businessRef, refResult);
         }
     }
 
     public void postDbUpdate(BalanceSnapshot balanceSnapshot) {
-        Result<Boolean> result = determineBalanceStrategy(balanceSnapshot.getWalletId())
-                .afterUpdate(balanceSnapshot.getWalletId(), balanceSnapshot, balanceSnapshot.getVersion());
+        Result<Boolean> result = determineBalanceStrategy(balanceSnapshot.getWalletRef())
+                .afterUpdate(balanceSnapshot.getWalletRef(), balanceSnapshot, balanceSnapshot.getVersion());
         if (!result.isSuccess()) {
             log.error("after_update, cache strategy failed: {}, snapshot: {}", result, balanceSnapshot);
         }
     }
 
-    public Result<BalanceSnapshot> getByWalletId(String walletId) {
-        var result = doGetByWalletId(walletId);
+    public Result<BalanceSnapshot> getByWalletRef(String walletRef) {
+        var result = doGetByWalletRef(walletRef);
         if (result.isSuccess() && result.getValue() != null) {
             BalanceSnapshot balanceSnapshot = result.getValue();
-            String scopedRefId = buildRefCacheId(balanceSnapshot.getServiceId(), balanceSnapshot.getWalletReferenceId());
-            promoteHotSnapshot(balanceSnapshot.getWalletId(), scopedRefId, balanceSnapshot.getOwnerType());
+            String scopedBusinessRef = buildBusinessRefCacheId(balanceSnapshot.getServiceId(),
+                    balanceSnapshot.getWalletBusinessRef());
+            promoteHotSnapshot(balanceSnapshot.getWalletRef(), scopedBusinessRef, balanceSnapshot.getOwnerType());
         }
         return result;
     }
 
-    public Result<BalanceSnapshot> doGetByWalletId(String walletId) {
-        var snapshotCache = determineBalanceStrategy(walletId);
+    private Result<BalanceSnapshot> doGetByWalletRef(String walletRef) {
+        var snapshotCache = determineBalanceStrategy(walletRef);
 
-        Result<CacheReadResult<BalanceSnapshot>> cacheResult = snapshotCache.get(walletId);
+        Result<CacheReadResult<BalanceSnapshot>> cacheResult = snapshotCache.get(walletRef);
         if (!cacheResult.isSuccess()) {
-            log.error("getByWalletId cache failed, walletId: {}, result: {}", walletId, cacheResult);
+            log.error("get by wallet_ref cache failed, wallet_ref={}, result={}", walletRef, cacheResult);
         } else {
             CacheReadResult<BalanceSnapshot> valueInfo = cacheResult.getValue();
             if (valueInfo.isValueHit() || valueInfo.isNegativeHit()) {
@@ -91,16 +96,16 @@ public class BalanceSnapshotStore {
             }
         }
 
-        BalanceSnapshot balanceSnapshot = balanceRepository.getByWalletId(walletId);
+        BalanceSnapshot balanceSnapshot = balanceRepository.getByWalletRef(walletRef);
         if (balanceSnapshot != null) {
-            Result<Boolean> setResult = snapshotCache.afterDbHit(balanceSnapshot.getWalletId(), balanceSnapshot, balanceSnapshot.getVersion());
+            Result<Boolean> setResult = snapshotCache.afterDbHit(balanceSnapshot.getWalletRef(), balanceSnapshot, balanceSnapshot.getVersion());
             if (!setResult.isSuccess()) {
-                log.error("getByWalletId|afterDbHit cache failed, snapshot: {}, result: {}", balanceSnapshot, setResult);
+                log.error("getByWalletRef|afterDbHit cache failed, snapshot: {}, result: {}", balanceSnapshot, setResult);
             }
         } else {
-            Result<Boolean> setResult = snapshotCache.afterDbMiss(walletId);
+            Result<Boolean> setResult = snapshotCache.afterDbMiss(walletRef);
             if (!setResult.isSuccess()) {
-                log.error("afterDbMiss cache failed, walletId: {}, result: {}", walletId, setResult);
+                log.error("afterDbMiss cache failed, wallet_ref={}, result={}", walletRef, setResult);
             }
         }
 
@@ -109,22 +114,25 @@ public class BalanceSnapshotStore {
 
     // negative value for cache miss, key -> NULL
     // querying by ref id is a user-facing path, so keep a stable negative cache here
-    public Result<BalanceSnapshot> getByRefId(ServiceId serviceId, String refId) {
-        String scopedRefId = buildRefCacheId(serviceId, refId);
-        Result<BalanceSnapshot> snapshotResult = doGetByRefId(serviceId, refId, scopedRefId);
+    public Result<BalanceSnapshot> getByBusinessRef(ServiceId serviceId, String businessRef) {
+        String scopedBusinessRef = buildBusinessRefCacheId(serviceId, businessRef);
+        Result<BalanceSnapshot> snapshotResult = doGetByBusinessRef(serviceId, businessRef, scopedBusinessRef);
         if (snapshotResult.isSuccess() && snapshotResult.getValue() != null) {
             // try to promote hot snapshot
             BalanceSnapshot balanceSnapshot = snapshotResult.getValue();
-            String scopedSnapshotRefId = buildRefCacheId(balanceSnapshot.getServiceId(), balanceSnapshot.getWalletReferenceId());
-            promoteHotSnapshot(balanceSnapshot.getWalletId(), scopedSnapshotRefId, balanceSnapshot.getOwnerType());
+            String scopedSnapshotRefId = buildBusinessRefCacheId(balanceSnapshot.getServiceId(), balanceSnapshot.getWalletBusinessRef());
+            promoteHotSnapshot(balanceSnapshot.getWalletRef(), scopedSnapshotRefId, balanceSnapshot.getOwnerType());
         }
         return snapshotResult;
     }
 
-    private Result<BalanceSnapshot> doGetByRefId(ServiceId serviceId, String refId, String scopedRefId) {
-        Result<CacheReadResult<String>> refCacheResult = determineRefStrategy(scopedRefId).get(scopedRefId);
+    private Result<BalanceSnapshot> doGetByBusinessRef(ServiceId serviceId, String businessRef,
+                                                       String scopedBusinessRef) {
+        Result<CacheReadResult<String>> refCacheResult = determineRefStrategy(scopedBusinessRef)
+                .get(scopedBusinessRef);
         if (!refCacheResult.isSuccess()) {
-            log.error("get cache failed, serviceId: {}, ref_id: {}, result: {}", serviceId, refId, refCacheResult);
+            log.error("get cache failed, service_id={}, wallet_business_ref={}, result={}",
+                    serviceId, businessRef, refCacheResult);
         } else {
             CacheReadResult<String> cacheInfo = refCacheResult.getValue();
             if (cacheInfo.isNegativeHit()) {
@@ -132,44 +140,51 @@ public class BalanceSnapshotStore {
                 return Result.success(null);
             }
             if (cacheInfo.isValueHit()) {
-                String walletId = cacheInfo.value();
-                Result<BalanceSnapshot> snapshotResult = getByWalletId(walletId);
+                String walletRef = cacheInfo.value();
+                Result<BalanceSnapshot> snapshotResult = getByWalletRef(walletRef);
                 if (snapshotResult.isFailed() || snapshotResult.getValue() != null) {
                     return snapshotResult;
                 }
 
-                log.error("ref cache hit but balance snapshot not found, serviceId: {}, ref_id: {}, walletId: {}", serviceId, refId, walletId);
-                return loadByRefIdFromDb(serviceId, refId, scopedRefId);
+                log.error("business-ref cache hit but snapshot not found, service_id={}, wallet_business_ref={}, wallet_ref={}",
+                        serviceId, businessRef, walletRef);
+                return loadByBusinessRefFromDb(serviceId, businessRef, scopedBusinessRef);
             }
         }
 
-        return loadByRefIdFromDb(serviceId, refId, scopedRefId);
+        return loadByBusinessRefFromDb(serviceId, businessRef, scopedBusinessRef);
     }
 
-    private Result<BalanceSnapshot> loadByRefIdFromDb(ServiceId serviceId, String refId, String scopedRefId) {
-        BalanceSnapshot snapshot = balanceRepository.getByWalletReferenceId(serviceId, refId);
+    private Result<BalanceSnapshot> loadByBusinessRefFromDb(ServiceId serviceId, String businessRef,
+                                                            String scopedBusinessRef) {
+        BalanceSnapshot snapshot = balanceRepository.getByWalletBusinessRef(serviceId, businessRef);
         if (snapshot != null) {
-            Result<Boolean> setRefCacheResult = determineRefStrategy(scopedRefId).afterDbHit(scopedRefId, snapshot.getWalletId());
+            Result<Boolean> setRefCacheResult = determineRefStrategy(scopedBusinessRef)
+                    .afterDbHit(scopedBusinessRef, snapshot.getWalletRef());
             if (!setRefCacheResult.isSuccess()) {
-                log.error("set ref cache failed, serviceId: {}, ref_id: {}, result: {}", serviceId, refId, setRefCacheResult);
+                log.error("set business-ref cache failed, service_id={}, wallet_business_ref={}, result={}",
+                        serviceId, businessRef, setRefCacheResult);
             }
 
-            Result<Boolean> result = determineBalanceStrategy(snapshot.getWalletId()).afterDbHit(snapshot.getWalletId(), snapshot, snapshot.getVersion());
+            Result<Boolean> result = determineBalanceStrategy(snapshot.getWalletRef())
+                    .afterDbHit(snapshot.getWalletRef(), snapshot, snapshot.getVersion());
             if (!result.isSuccess()) {
-                log.error("doGetByRefId|afterDbHit cache failed, snapshot: {}, result: {}", snapshot, result);
+                log.error("doGetByBusinessRef|afterDbHit cache failed, snapshot: {}, result: {}",
+                        snapshot, result);
             }
         } else {
-            Result<Boolean> result = determineRefStrategy(scopedRefId).afterDbMiss(scopedRefId);
+            Result<Boolean> result = determineRefStrategy(scopedBusinessRef).afterDbMiss(scopedBusinessRef);
             if (!result.isSuccess()) {
-                log.error("set negative result failed, serviceId: {}, ref_id: {}, result: {}", serviceId, refId, result);
+                log.error("set negative result failed, service_id={}, wallet_business_ref={}, result={}",
+                        serviceId, businessRef, result);
             }
         }
         return Result.success(snapshot);
     }
 
-    private void promoteHotSnapshot(String walletId, String scopedRefId, OwnerType ownerType) {
+    private void promoteHotSnapshot(String walletRef, String scopedRefId, OwnerType ownerType) {
         if (ownerType == OwnerType.SYSTEM) {
-            hotBalanceClassifier.promote(walletId);
+            hotBalanceClassifier.promote(walletRef);
             hotBalanceRefClassifier.promote(scopedRefId);
         }
     }
@@ -178,11 +193,11 @@ public class BalanceSnapshotStore {
         return hotBalanceRefClassifier.isPromoted(scopedRefId) ? hotBalanceRefCache : balanceRefCache;
     }
 
-    private VersionCacheStrategy<BalanceSnapshot> determineBalanceStrategy(String walletId) {
-        return hotBalanceClassifier.isPromoted(walletId) ? hotBalanceCache : normalBalanceCache;
+    private VersionCacheStrategy<BalanceSnapshot> determineBalanceStrategy(String walletRef) {
+        return hotBalanceClassifier.isPromoted(walletRef) ? hotBalanceCache : normalBalanceCache;
     }
 
-    private String buildRefCacheId(ServiceId serviceId, String refId) {
-        return serviceId.code + ":" + refId;
+    private String buildBusinessRefCacheId(ServiceId serviceId, String businessRef) {
+        return serviceId.code + ":" + businessRef;
     }
 }

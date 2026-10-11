@@ -50,7 +50,7 @@ public class WalletServiceImpl extends WalletServiceGrpc.WalletServiceImplBase {
         responseObserver.onCompleted();
     }
 
-    // at most one transaction line for one wallet id
+    // A request may contain at most one transaction line for each Wallet reference.
     @Override
     public void atomicTransaction(AtomicTransactionRequestPb request, StreamObserver<AtomicTransactionReplyPb> responseObserver) {
         AtomicTransactionReplyPb reply;
@@ -106,14 +106,16 @@ public class WalletServiceImpl extends WalletServiceGrpc.WalletServiceImplBase {
     }
 
     @Override
-    public void getSnapshotByWalletId(GetSnapshotByIdRequestPb request, StreamObserver<GetSnapshotReplyPb> responseObserver) {
-        handleSnapshotRequest(GetBalanceSnapshotProcessor.LookupType.WALLET_ID, null, request.getWalletId(), responseObserver);
+    public void getSnapshotByWalletRef(GetSnapshotByWalletRefRequestPb request, StreamObserver<GetSnapshotReplyPb> responseObserver) {
+        handleSnapshotRequest(GetBalanceSnapshotProcessor.LookupType.WALLET_REF, null,
+                request.getWalletRef(), responseObserver);
     }
 
     @Override
-    public void getSnapshotByRefId(GetSnapshotByRefIdRequestPb request, StreamObserver<GetSnapshotReplyPb> responseObserver) {
+    public void getSnapshotByBusinessRef(GetSnapshotByBusinessRefRequestPb request, StreamObserver<GetSnapshotReplyPb> responseObserver) {
         ServiceId serviceId = EnumPbMappers.serviceIdPbMapper.to(request.getServiceId());
-        handleSnapshotRequest(GetBalanceSnapshotProcessor.LookupType.REF_ID, serviceId, request.getReferenceId(), responseObserver);
+        handleSnapshotRequest(GetBalanceSnapshotProcessor.LookupType.BUSINESS_REF, serviceId,
+                request.getWalletBusinessRef(), responseObserver);
     }
 
     private void handleSnapshotRequest(GetBalanceSnapshotProcessor.LookupType lookupType,
@@ -146,8 +148,8 @@ public class WalletServiceImpl extends WalletServiceGrpc.WalletServiceImplBase {
     }
 
     private String operationFor(GetBalanceSnapshotProcessor.LookupType lookupType) {
-        return lookupType == GetBalanceSnapshotProcessor.LookupType.WALLET_ID
-                ? WalletMetricTagValues.Operations.GET_SNAPSHOT_BY_WALLET_ID
-                : WalletMetricTagValues.Operations.GET_SNAPSHOT_BY_REF_ID;
+        return lookupType == GetBalanceSnapshotProcessor.LookupType.WALLET_REF
+                ? WalletMetricTagValues.Operations.GET_SNAPSHOT_BY_WALLET_REF
+                : WalletMetricTagValues.Operations.GET_SNAPSHOT_BY_BUSINESS_REF;
     }
 }

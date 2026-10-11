@@ -25,20 +25,20 @@ public class BalanceSnapshotRepository extends DbBaseRepository<BalanceSnapshot,
         super(mapper);
     }
 
-    public List<BalanceSnapshot> selectByWalletIds(List<String> walletIds) {
-        var query = Wrappers.<BalanceSnapshot>lambdaQuery().in(BalanceSnapshot::getWalletId, walletIds);
+    public List<BalanceSnapshot> selectByWalletRefs(List<String> walletRefs) {
+        var query = Wrappers.<BalanceSnapshot>lambdaQuery().in(BalanceSnapshot::getWalletRef, walletRefs);
         return mapper.selectList(query);
     }
 
-    public BalanceSnapshot getByWalletId(String walletId) {
-        var query = Wrappers.<BalanceSnapshot>lambdaQuery().eq(BalanceSnapshot::getWalletId, walletId);
+    public BalanceSnapshot getByWalletRef(String walletRef) {
+        var query = Wrappers.<BalanceSnapshot>lambdaQuery().eq(BalanceSnapshot::getWalletRef, walletRef);
         return mapper.selectOne(query);
     }
 
-    public BalanceSnapshot getByWalletReferenceId(ServiceId serviceId, String walletReferenceId) {
+    public BalanceSnapshot getByWalletBusinessRef(ServiceId serviceId, String walletBusinessRef) {
         var query = Wrappers.<BalanceSnapshot>lambdaQuery()
                 .eq(BalanceSnapshot::getServiceId, serviceId)
-                .eq(BalanceSnapshot::getWalletReferenceId, walletReferenceId);
+                .eq(BalanceSnapshot::getWalletBusinessRef, walletBusinessRef);
         return mapper.selectOne(query);
     }
 
@@ -62,10 +62,13 @@ public class BalanceSnapshotRepository extends DbBaseRepository<BalanceSnapshot,
         if (!Objects.equals(now.getReserved(), old.getReserved())) {
             toUpdate.setReserved(now.getReserved());
         }
+        if (!Objects.equals(now.getLastWalletTxnRef(), old.getLastWalletTxnRef())) {
+            toUpdate.setLastWalletTxnRef(now.getLastWalletTxnRef());
+        }
         toUpdate.setVersion(old.getVersion());
 
         var wrapper = updateLambdaWrapper().eq(BalanceSnapshot::getId, old.getId())
-                .eq(BalanceSnapshot::getWalletId, old.getWalletId())
+                .eq(BalanceSnapshot::getWalletRef, old.getWalletRef())
                 .eq(BalanceSnapshot::getAssetId, old.getAssetId())
                 .eq(BalanceSnapshot::getWalletStatus, old.getWalletStatus())
                 .eq(BalanceSnapshot::getAvailable, old.getAvailable())
@@ -79,26 +82,27 @@ public class BalanceSnapshotRepository extends DbBaseRepository<BalanceSnapshot,
 
     public List<BalanceSnapshot> selectIdByRefs(ServiceId serviceId, List<String> walletRefs) {
         LambdaQueryWrapper<BalanceSnapshot> wrapper = new LambdaQueryWrapper<>();
-        wrapper = wrapper.select(BalanceSnapshot::getId, BalanceSnapshot::getWalletId, BalanceSnapshot::getServiceId, BalanceSnapshot::getWalletReferenceId)
+        wrapper = wrapper.select(BalanceSnapshot::getId, BalanceSnapshot::getWalletRef,
+                        BalanceSnapshot::getServiceId, BalanceSnapshot::getWalletBusinessRef)
                 .eq(BalanceSnapshot::getServiceId, serviceId)
-                .in(BalanceSnapshot::getWalletReferenceId, walletRefs);
+                .in(BalanceSnapshot::getWalletRef, walletRefs);
         return this.mapper.selectList(wrapper);
     }
 
     public List<BalanceSnapshot> selectByRefs(ServiceId serviceId, List<String> walletRefs) {
         LambdaQueryWrapper<BalanceSnapshot> wrapper = new LambdaQueryWrapper<>();
         wrapper = wrapper.eq(BalanceSnapshot::getServiceId, serviceId)
-                .in(BalanceSnapshot::getWalletReferenceId, walletRefs);
+                .in(BalanceSnapshot::getWalletRef, walletRefs);
         return this.mapper.selectList(wrapper);
     }
 
-    public int reserveFromWalletId(Long id, String walletId, String assetId, long amount) {
+    public int reserveFromWalletRef(Long id, String walletRef, String assetId, long amount) {
         if (amount <= 0) {
             throw WalletExceptionFactory.invalidValue("amount<=0, amount: " + amount);
         }
         LambdaUpdateWrapper<BalanceSnapshot> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(BalanceSnapshot::getId, id)
-                .eq(BalanceSnapshot::getWalletId, walletId)
+                .eq(BalanceSnapshot::getWalletRef, walletRef)
                 .eq(BalanceSnapshot::getAssetId, assetId)
                 .eq(BalanceSnapshot::getWalletStatus, WalletStatus.OPEN)
                 .ge(BalanceSnapshot::getAvailable, amount)
@@ -107,13 +111,13 @@ public class BalanceSnapshotRepository extends DbBaseRepository<BalanceSnapshot,
         return this.mapper.update(wrapper);
     }
 
-    public int releaseFromWalletId(Long id, String walletId, String assetId, long amount) {
+    public int releaseFromWalletRef(Long id, String walletRef, String assetId, long amount) {
         if (amount <= 0) {
             throw WalletExceptionFactory.invalidValue("amount<=0, amount: " + amount);
         }
         LambdaUpdateWrapper<BalanceSnapshot> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(BalanceSnapshot::getId, id)
-                .eq(BalanceSnapshot::getWalletId, walletId)
+                .eq(BalanceSnapshot::getWalletRef, walletRef)
                 .eq(BalanceSnapshot::getAssetId, assetId)
                 .eq(BalanceSnapshot::getWalletStatus, WalletStatus.OPEN)
                 .ge(BalanceSnapshot::getReserved, amount)
@@ -122,13 +126,13 @@ public class BalanceSnapshotRepository extends DbBaseRepository<BalanceSnapshot,
         return this.mapper.update(wrapper);
     }
 
-    public int transferOutFromWalletId(Long id, String walletId, String assetId, long amount) {
+    public int transferOutFromWalletRef(Long id, String walletRef, String assetId, long amount) {
         if (amount <= 0) {
             throw WalletExceptionFactory.invalidValue("amount<=0, amount: " + amount);
         }
         LambdaUpdateWrapper<BalanceSnapshot> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(BalanceSnapshot::getId, id)
-                .eq(BalanceSnapshot::getWalletId, walletId)
+                .eq(BalanceSnapshot::getWalletRef, walletRef)
                 .eq(BalanceSnapshot::getAssetId, assetId)
                 .eq(BalanceSnapshot::getWalletStatus, WalletStatus.OPEN)
                 .ge(BalanceSnapshot::getReserved, amount)
@@ -136,13 +140,13 @@ public class BalanceSnapshotRepository extends DbBaseRepository<BalanceSnapshot,
         return this.mapper.update(wrapper);
     }
 
-    public int transferInToWalletId(Long id, String walletId, String assetId, long amount) {
+    public int transferInToWalletRef(Long id, String walletRef, String assetId, long amount) {
         if (amount <= 0) {
             throw WalletExceptionFactory.invalidValue("amount<=0, amount: " + amount);
         }
         LambdaUpdateWrapper<BalanceSnapshot> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(BalanceSnapshot::getId, id)
-                .eq(BalanceSnapshot::getWalletId, walletId)
+                .eq(BalanceSnapshot::getWalletRef, walletRef)
                 .eq(BalanceSnapshot::getAssetId, assetId)
                 .eq(BalanceSnapshot::getWalletStatus, WalletStatus.OPEN)
                 .setSql(String.format("`available` = `available` + %d", amount));

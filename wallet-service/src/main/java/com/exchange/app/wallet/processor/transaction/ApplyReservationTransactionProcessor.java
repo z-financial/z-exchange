@@ -62,9 +62,9 @@ public class ApplyReservationTransactionProcessor {
         return true;
     }
 
-    private ApplyReservationTransactionReplyPb replySuccess(String txnId, String detail) {
+    private ApplyReservationTransactionReplyPb replySuccess(String walletTxnRef, String detail) {
         detail = Objects.requireNonNullElse(detail, "");
-        return ApplyReservationTransactionReplyPb.newBuilder().setTransactionId(txnId)
+        return ApplyReservationTransactionReplyPb.newBuilder().setWalletTxnRef(walletTxnRef)
                 .setError(PbErrorBuilder.success(detail))
                 .build();
     }
@@ -72,7 +72,7 @@ public class ApplyReservationTransactionProcessor {
     private ApplyReservationTransactionReplyPb replySuccess(WalletTransaction txn, String detail) {
         detail = Objects.requireNonNullElse(detail, "");
         return ApplyReservationTransactionReplyPb.newBuilder()
-                .setTransactionId(txn.getTxnId())
+                .setWalletTxnRef(txn.getWalletTxnRef())
                 .setStatus(EnumPbMappers.transactionStatusPbMapper.from(txn.getTxnStatus()))
                 .setError(PbErrorBuilder.success(detail))
                 .build();

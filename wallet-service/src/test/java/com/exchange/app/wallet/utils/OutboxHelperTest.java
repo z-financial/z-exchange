@@ -10,16 +10,16 @@ class OutboxHelperTest {
     @Test
     void preservesAllocatedEventIdAndTransactionRoutingIdentity() throws Exception {
         WalletTransaction transaction = new WalletTransaction();
-        transaction.setTxnId("wallet-txn-1");
+        transaction.setWalletTxnRef("wallet-txn-ref-1");
         PostTransactionRequestPb request = PostTransactionRequestPb.newBuilder()
-                .setReferenceId(transaction.getTxnId())
+                .setWalletTxnRef(transaction.getWalletTxnRef())
                 .build();
 
         var outbox = OutboxHelper.fromPostTransactionRequest("701", request, transaction);
 
         assertEquals("701", outbox.getEventId());
-        assertEquals(transaction.getTxnId(), outbox.getCommandId());
-        assertEquals(transaction.getTxnId(), outbox.getPartitionKey());
+        assertEquals(transaction.getWalletTxnRef(), outbox.getCommandId());
+        assertEquals(transaction.getWalletTxnRef(), outbox.getPartitionKey());
         assertEquals(request, PostTransactionRequestPb.parseFrom(outbox.getPayload()));
     }
 }

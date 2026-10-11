@@ -5,6 +5,8 @@ import com.exchange.app.wallet.po.enums.ServiceId;
 import com.exchange.app.wallet.po.wallet.BalanceSnapshot;
 import com.exchange.app.wallet.result.WalletServiceErrorCode;
 import com.exchange.common.result.Result;
+import com.exchange.common.identity.EntityRefCodec;
+import com.exchange.common.identity.EntityRefType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
@@ -16,9 +18,10 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
 public class GetBalanceSnapshotProcessor {
     private final BalanceSnapshotStore balanceSnapshotStore;
+    private final EntityRefCodec entityRefCodec;
 
     public enum LookupType {
-        WALLET_ID, REF_ID
+        WALLET_REF, BUSINESS_REF
     }
 
     public Result<BalanceSnapshot> getBalanceSnapshot(LookupType type, String lookupValue) {
@@ -34,18 +37,24 @@ public class GetBalanceSnapshotProcessor {
             log.error("lookup_type is required");
             return Result.failure(WalletServiceErrorCode.INVALID_REQUEST_PARAMETER, "lookup_type is required");
         }
-        if (type == LookupType.REF_ID && (serviceId == null || serviceId == ServiceId.UNKNOWN)) {
+        if (type == LookupType.BUSINESS_REF && (serviceId == null || serviceId == ServiceId.UNKNOWN)) {
             log.error("service_id is required for ref lookup, serviceId: {}", serviceId);
             return Result.failure(WalletServiceErrorCode.INVALID_REQUEST_PARAMETER, "invalid service id: " + serviceId);
         }
 
         Result<BalanceSnapshot> snapshotResult;
         switch (type) {
-            case WALLET_ID:
-                snapshotResult = balanceSnapshotStore.getByWalletId(lookupValue);
+            case WALLET_REF:
+                Result<Void> referenceValidation =
+                        entityRefCodec.validate(lookupValue, EntityRefType.WALLET);
+                if (referenceValidation.isFailed()) {
+                    return Result.failure(WalletServiceErrorCode.INVALID_REQUEST_PARAMETER,
+                            referenceValidation.getDetail());
+                }
+                snapshotResult = balanceSnapshotStore.getByWalletRef(lookupValue);
                 break;
-            case REF_ID:
-                snapshotResult = balanceSnapshotStore.getByRefId(serviceId, lookupValue);
+            case BUSINESS_REF:
+                snapshotResult = balanceSnapshotStore.getByBusinessRef(serviceId, lookupValue);
                 break;
             default:
                 log.error("invalid lookup type: {}", type);

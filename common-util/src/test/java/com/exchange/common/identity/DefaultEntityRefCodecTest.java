@@ -1,6 +1,7 @@
 package com.exchange.common.identity;
 
 import com.exchange.common.result.error.EntityReferenceErrorCode;
+import com.exchange.common.result.Result;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
@@ -102,9 +103,16 @@ class DefaultEntityRefCodecTest {
     void expectedTypeValidationDoesNotGuessRouting() {
         String walletRef = codec.encode(EntityRefType.WALLET, 99);
 
-        assertCode(
-                EntityReferenceErrorCode.UNEXPECTED_TYPE,
-                () -> codec.decode(walletRef, EntityRefType.LEDGER_ACCOUNT));
+        Result<Void> result = codec.validate(walletRef, EntityRefType.LEDGER_ACCOUNT);
+
+        assertEquals(EntityReferenceErrorCode.UNEXPECTED_TYPE, result.getErrorCode());
+    }
+
+    @Test
+    void validReferenceValidationDoesNotExposeInternalId() {
+        String walletRef = codec.encode(EntityRefType.WALLET, 99);
+
+        assertEquals(Result.success(), codec.validate(walletRef, EntityRefType.WALLET));
     }
 
     private static void assertCode(

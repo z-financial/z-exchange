@@ -7,17 +7,19 @@ import com.exchange.app.ledger.po.enums.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 @TableName("accounts")
 public class Account {
-    @TableId(type = IdType.AUTO)
-    private Long id;
-    private String accountId;
+    @TableId(value = "internal_id", type = IdType.INPUT)
+    @ToString.Exclude
+    private Long internalId;
+    private String ledgerAccountRef;
     private ServiceId serviceId;
-    private String referenceId;
+    private String walletRef;
     private AccountCategory category;
     private NormalSide normalSide;
     private String ownerId;
@@ -25,7 +27,11 @@ public class Account {
     private String assetId;
     private AccountStatus accountStatus;
 
-    public static Account create(String accountId, ServiceId serviceId, String referenceId, AccountCategory category, NormalSide normalSide, String ownerId, OwnerType ownerType, String assetId, AccountStatus accountStatus) {
-        return new Account(0L, accountId, serviceId, referenceId, category, normalSide, ownerId, ownerType, assetId, accountStatus);
+    public static Account create(Long internalId, String ledgerAccountRef, ServiceId serviceId,
+                                 String walletRef, AccountCategory category, NormalSide normalSide,
+                                 String ownerId, OwnerType ownerType, String assetId,
+                                 AccountStatus accountStatus) {
+        return new Account(internalId, ledgerAccountRef, serviceId, walletRef, category, normalSide,
+                ownerId, ownerType, assetId, accountStatus);
     }
 }

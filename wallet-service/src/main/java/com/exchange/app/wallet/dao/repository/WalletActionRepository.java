@@ -27,9 +27,9 @@ public class WalletActionRepository extends DbBaseRepository<WalletAction, Walle
         return mapper.batchInsert(list);
     }
 
-    public List<WalletAction> selectByTxnId(String txnId, LambdaQueryWrapper<WalletAction> queryWrapper) {
+    public List<WalletAction> selectByWalletTxnRef(String walletTxnRef, LambdaQueryWrapper<WalletAction> queryWrapper) {
         queryWrapper = Objects.requireNonNullElseGet(queryWrapper, LambdaQueryWrapper::new);
-        queryWrapper.eq(WalletAction::getTxnId, txnId);
+        queryWrapper.eq(WalletAction::getWalletTxnRef, walletTxnRef);
         return mapper.selectList(queryWrapper);
     }
 }

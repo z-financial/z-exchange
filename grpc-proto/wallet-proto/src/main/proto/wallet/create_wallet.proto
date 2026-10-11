@@ -18,4 +18,5 @@ message CreateWalletRequestPb {
 
 message CreateWalletReplyPb {
   common.ErrorPb error = 1;
+  string wallet_ref = 2;
 }

@@ -34,7 +34,7 @@ public class IdempPrecheckProcessor {
 
     private final WalletTransactionRepository walletTransactionManager;
 
-    // return txn_id if exists
+    // Return the persisted Wallet transaction reference when this is an accepted replay.
     // return null if not exists
     public Result<String> idempAndValidatePrecheck(RequestInfo requestInfo) {
         Result<Void> precheckResult = TransactionValidateHelper.requestPrecheck(requestInfo);
@@ -71,7 +71,7 @@ public class IdempPrecheckProcessor {
             // set idemp to DONE when found wallet txn
             Result<Void> markDoneResult = idempotencyClient.markIdempDone(
                     GlobalServiceId.WALLET.code, Constant.SCOPE, requestInfo.idempotenceKey,
-                    String.valueOf(requestInfo.getStableHash()), requestInfo.token, walletTxn.getTxnId(),
+                    String.valueOf(requestInfo.getStableHash()), requestInfo.token, walletTxn.getWalletTxnRef(),
                     JitterHelper.jitter(idempConfig.getDoneTtl(), idempConfig.getJitterMs()));
             if (markDoneResult.isFailed()) {
                 // DB idempotency is authoritative; Redis refresh failure must not hide a committed replay.
@@ -79,7 +79,7 @@ public class IdempPrecheckProcessor {
             }
 
             log.info("wallet txn already exists: {}", walletTxn);
-            return Result.success(walletTxn.getTxnId(), "wallet txn already exists");
+            return Result.success(walletTxn.getWalletTxnRef(), "wallet txn already exists");
         }
 
         return Result.success();

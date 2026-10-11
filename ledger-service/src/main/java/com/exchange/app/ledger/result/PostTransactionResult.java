@@ -7,7 +7,7 @@ import java.util.Objects;
 // Transport-neutral result for the post ledger use case.
 // Keeps exact ledger error codes and metric facts before conversion to protobuf.
 public record PostTransactionResult(
-        String referenceId,
+        String walletTxnRef,
         String ledgerTxnId,
         LedgerServiceErrorCode errorCode,
         String detail,
@@ -23,8 +23,8 @@ public record PostTransactionResult(
             if (errorCode != null) {
                 throw new IllegalArgumentException("successful post result should not have errorCode");
             }
-            if (ValidateHelper.isBlank(referenceId)) {
-                throw new IllegalArgumentException("successful post result requires referenceId");
+            if (ValidateHelper.isBlank(walletTxnRef)) {
+                throw new IllegalArgumentException("successful post result requires walletTxnRef");
             }
             if (ValidateHelper.isBlank(ledgerTxnId)) {
                 throw new IllegalArgumentException("successful post result requires ledgerTxnId");
@@ -38,9 +38,9 @@ public record PostTransactionResult(
         }
     }
 
-    public static PostTransactionResult created(String referenceId, String ledgerTxnId, String detail, int entryCount) {
+    public static PostTransactionResult created(String walletTxnRef, String ledgerTxnId, String detail, int entryCount) {
         return new PostTransactionResult(
-                referenceId,
+                walletTxnRef,
                 ledgerTxnId,
                 null,
                 detail,
@@ -51,13 +51,13 @@ public record PostTransactionResult(
     }
 
     public static PostTransactionResult idempotentReplay(
-            String referenceId,
+            String walletTxnRef,
             String ledgerTxnId,
             String detail,
             IdempotentSource source
     ) {
         return new PostTransactionResult(
-                referenceId,
+                walletTxnRef,
                 ledgerTxnId,
                 null,
                 detail,

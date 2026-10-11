@@ -19,11 +19,12 @@ public class LedgerEntry {
     // TODO should we add a seq field in LedgerEntry and set (txn_id, seq) as unique key, so that a txn cannot insert entries once it has been posted
     private String txnId;
     private String assetId;
-    private String accountId;
+    private String ledgerAccountRef;
     private long amount;
     private Direction direction;
 
-    public static LedgerEntry create(String entryId, String txnId, String assetId, String accountId, long amount, Direction direction) {
-        return new LedgerEntry(0L, entryId, txnId, assetId, accountId, amount, direction);
+    public static LedgerEntry create(String entryId, String txnId, String assetId,
+                                     String ledgerAccountRef, long amount, Direction direction) {
+        return new LedgerEntry(0L, entryId, txnId, assetId, ledgerAccountRef, amount, direction);
     }
 }

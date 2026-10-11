@@ -37,15 +37,15 @@ public class AfterPostLedgerProcessor {
     private final UpdateReservationProcessor updateReservationProcessor;
     private final UpdateBalanceSnapshotProcessor updateBalanceSnapshotProcessor;
 
-    public Result<WalletTransaction> afterPostLedger(String txnId) {
-        Result<TransactionInfo> txnInfoResult = getTxnInfo(txnId);
+    public Result<WalletTransaction> afterPostLedger(String walletTxnRef) {
+        Result<TransactionInfo> txnInfoResult = getTxnInfo(walletTxnRef);
         if (txnInfoResult.isFailed()) {
-            log.error("failed to find transaction info, txnId: {}, result: {}", txnId, txnInfoResult);
+            log.error("failed to find transaction info, wallet_txn_ref={}, result={}", walletTxnRef, txnInfoResult);
             return Result.failure(txnInfoResult);
         }
         TransactionInfo txnInfo = txnInfoResult.getValue();
         if (txnInfo.walletTxn.hasFinalized()) {
-            log.info("wallet txn has finalized, txnId: {}", txnId);
+            log.info("wallet transaction has finalized, wallet_txn_ref={}", walletTxnRef);
             return Result.success(txnInfo.walletTxn);
         }
 
@@ -55,16 +55,17 @@ public class AfterPostLedgerProcessor {
         Result<List<BalanceSnapshot>> outResult = dbTxnExecutor.executeWithDefault(() -> {
             // should update all reservations here
             Result<Void> reservationResult = updateReservationProcessor.updateReservations(txnInfo.reservations,
-                    (reservation) -> updateReservationAfterPosting(reservation, txnInfo.walletIdToPostActions));
+                    (reservation) -> updateReservationAfterPosting(reservation, txnInfo.walletRefToPostActions));
             if (reservationResult.isFailed()) {
                 return Result.failure(reservationResult);
             }
 
-            Result<List<BalanceSnapshot>> snapshotResult = updateSnapshotsAfterPosting(txnInfo.walletIdToPostActions, snapshotIdsInOrder);
+            Result<List<BalanceSnapshot>> snapshotResult = updateSnapshotsAfterPosting(txnInfo.walletRefToPostActions, snapshotIdsInOrder);
             if (snapshotResult.isFailed()) {
                 return Result.failure(snapshotResult);
             }
-            if (walletTransactionManager.updateTransactionStatus(txnInfo.walletTxn, txnInfo.walletTxn.getId(), TransactionStatus.COMPLETED)
+            if (walletTransactionManager.updateTransactionStatus(txnInfo.walletTxn,
+                    txnInfo.walletTxn.getInternalId(), TransactionStatus.COMPLETED)
                     != 1) {
                 log.error("wallet_transaction_update_failed, transaction: {}", txnInfo.walletTxn);
                 return Result.failure(WalletServiceErrorCode.WALLET_TRANSACTION_UPDATE_FAILED, "transaction_update_failed");
@@ -77,7 +78,7 @@ public class AfterPostLedgerProcessor {
         // Cache refresh is best effort and must run only after the DB transaction commits.
         postDbUpdateSnapshots(outResult.getValue());
 
-        WalletTransaction txn = walletTransactionManager.selectById(txnInfo.walletTxn.getId());
+        WalletTransaction txn = walletTransactionManager.selectByInternalId(txnInfo.walletTxn.getInternalId());
         if (txn == null) {
             log.error("wallet_transaction_not_found, transaction: {}", txnInfo.walletTxn);
             return Result.failure(WalletServiceErrorCode.WALLET_TRANSACTION_NOT_FOUND, "wallet_transaction_not_found");
@@ -85,28 +86,32 @@ public class AfterPostLedgerProcessor {
         return Result.success(txn);
     }
 
-    private Result<TransactionInfo> getTxnInfo(String txnId) {
-        WalletTransaction txn = walletTransactionManager.selectByTxnId(txnId);
+    private Result<TransactionInfo> getTxnInfo(String walletTxnRef) {
+        WalletTransaction txn = walletTransactionManager.selectByWalletTxnRef(walletTxnRef);
         if (txn == null) {
-            log.error("getTxnInfo failed, {}", txnId);
-            return Result.failure(WalletServiceErrorCode.WALLET_TRANSACTION_NOT_FOUND, "no txn found for txnId: " + txnId);
+            log.error("getTxnInfo failed, wallet_txn_ref={}", walletTxnRef);
+            return Result.failure(WalletServiceErrorCode.WALLET_TRANSACTION_NOT_FOUND,
+                    "no transaction found for wallet_txn_ref=" + walletTxnRef);
         }
 
-        List<WalletAction> afterPostingActions = walletActionManager.selectByTxnId(txn.getTxnId(), new LambdaQueryWrapper<>() {{
-            in(WalletAction::getActionType, ActionType.TRANSFER_IN, ActionType.TRANSFER_OUT, ActionType.CONSUME);
-        }});
+        List<WalletAction> afterPostingActions = walletActionManager.selectByWalletTxnRef(
+                txn.getWalletTxnRef(), new LambdaQueryWrapper<>() {{
+                    in(WalletAction::getActionType, ActionType.TRANSFER_IN, ActionType.TRANSFER_OUT, ActionType.CONSUME);
+                }});
 
-        List<String> walletIds = afterPostingActions.stream().map(WalletAction::getWalletId).distinct().collect(Collectors.toList());
-        List<BalanceSnapshot> snapshots = balanceSnapshotManager.selectByWalletIds(walletIds);
-        if (snapshots.size() != walletIds.size()) {
-            log.error("getTxnInfo failed, snapshot not found, txn: {}, walletIds: {}, snapshotsInDb: {}", txnId, walletIds, snapshots);
+        List<String> walletRefs = afterPostingActions.stream().map(WalletAction::getWalletRef).distinct().collect(Collectors.toList());
+        List<BalanceSnapshot> snapshots = balanceSnapshotManager.selectByWalletRefs(walletRefs);
+        if (snapshots.size() != walletRefs.size()) {
+            log.error("getTxnInfo failed, snapshot not found, wallet_txn_ref={}, wallet_refs={}",
+                    walletTxnRef, walletRefs);
             return Result.failure(WalletServiceErrorCode.BALANCE_SNAPSHOT_NOT_FOUND, "snapshot not found");
         }
 
         List<WalletAction> consumeActions = afterPostingActions.stream().filter(action -> action.getActionType() == ActionType.CONSUME).collect(Collectors.toList());
         List<WalletReservation> consumeReservations = new ArrayList<>();
         if (!consumeActions.isEmpty()) {
-            List<String> consumeReservationRefs = consumeActions.stream().map(WalletAction::getReservationId).distinct().collect(Collectors.toList());
+            List<String> consumeReservationRefs = consumeActions.stream()
+                    .map(WalletAction::getWalletReservationRef).distinct().collect(Collectors.toList());
             consumeReservations = walletReservationManager.selectByRefs(txn.getInitiator(), consumeReservationRefs);
             if (consumeReservationRefs.size() != consumeReservations.size()) {
                 log.error("reservation size mismatch, reservationFromDb: {}, reservationRefs: {}", consumeReservationRefs, consumeReservations);
@@ -125,14 +130,15 @@ public class AfterPostLedgerProcessor {
         return Result.success(transactionInfo);
     }
 
-    private Result<List<BalanceSnapshot>> updateSnapshotsAfterPosting(Map<String, List<WalletAction>> walletIdToActions, List<BalanceSnapshot> snapshots) {
+    private Result<List<BalanceSnapshot>> updateSnapshotsAfterPosting(Map<String, List<WalletAction>> walletRefToActions, List<BalanceSnapshot> snapshots) {
         List<BalanceSnapshot> snapshotInOrder = snapshots.stream().sorted(Comparator.comparing(BalanceSnapshot::getId)).collect(Collectors.toList());
         return updateBalanceSnapshotProcessor.updateSnapshots(snapshotInOrder,
-                (snapshot) -> doUpdateSnapshotAfterPosting(snapshot, walletIdToActions));
+                (snapshot) -> doUpdateSnapshotAfterPosting(snapshot, walletRefToActions));
     }
 
-    private Result<BalanceSnapshot> doUpdateSnapshotAfterPosting(BalanceSnapshot snapshot, Map<String, List<WalletAction>> walletIdToActions) {
-        for (WalletAction action : walletIdToActions.getOrDefault(snapshot.getWalletId(), Collections.emptyList())) {
+    private Result<BalanceSnapshot> doUpdateSnapshotAfterPosting(BalanceSnapshot snapshot, Map<String, List<WalletAction>> walletRefToActions) {
+        for (WalletAction action : walletRefToActions.getOrDefault(snapshot.getWalletRef(), Collections.emptyList())) {
+            snapshot.setLastWalletTxnRef(action.getWalletTxnRef());
             switch (action.getActionType()) {
                 case TRANSFER_OUT:
                     Result<Void> outValidateResult = TransactionValidateHelper.validateSnapshotForAction(snapshot, action);
@@ -163,8 +169,8 @@ public class AfterPostLedgerProcessor {
         }
     }
 
-    private Result<WalletReservation> updateReservationAfterPosting(WalletReservation reservation, Map<String, List<WalletAction>> walletIdToActions) {
-        for (WalletAction action : walletIdToActions.get(reservation.getWalletId())) {
+    private Result<WalletReservation> updateReservationAfterPosting(WalletReservation reservation, Map<String, List<WalletAction>> walletRefToActions) {
+        for (WalletAction action : walletRefToActions.get(reservation.getWalletRef())) {
             if (Objects.requireNonNull(action.getActionType()) == ActionType.CONSUME) {
                 if (reservation.getPendingSettle() < action.getAmount()) {
                     // TODO maybe throw exception? this is severe error (overspend risk in reservation)

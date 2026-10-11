@@ -9,6 +9,7 @@ import com.exchange.app.wallet.po.enums.ServiceId;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.util.Objects;
 
@@ -17,13 +18,13 @@ import java.util.Objects;
 @NoArgsConstructor
 @TableName("wallet_reservations")
 public class WalletReservation {
-    @TableId(type = IdType.AUTO)
-    private Long id;
-    private String reservationId;
+    @TableId(value = "internal_id", type = IdType.INPUT)
+    @ToString.Exclude
+    private Long internalId;
+    private String walletReservationRef;
     private ServiceId initiator;
     private String referenceId;
-    private String walletId;
-    private String walletReferenceId;
+    private String walletRef;
     private String assetId;
     private Long total;
     private Long remaining;
@@ -32,24 +33,7 @@ public class WalletReservation {
     private Long released;
     private ReservationStatus reservationStatus;
     private ReservationOutcome reservationOutcome;
-    private String reserveTxnId;
-
-    private WalletReservation(String reservationId, ServiceId initiator, String referenceId, String walletId, String walletReferenceId, String assetId, Long total, Long remaining, Long consumed, Long pendingSettle, Long released, ReservationStatus reservationStatus, ReservationOutcome reservationOutcome, String reserveTxnId) {
-        this.reservationId = reservationId;
-        this.initiator = initiator;
-        this.referenceId = referenceId;
-        this.walletId = walletId;
-        this.walletReferenceId = walletReferenceId;
-        this.assetId = assetId;
-        this.total = total;
-        this.remaining = remaining;
-        this.consumed = consumed;
-        this.pendingSettle = pendingSettle;
-        this.released = released;
-        this.reservationStatus = reservationStatus;
-        this.reservationOutcome = reservationOutcome;
-        this.reserveTxnId = reserveTxnId;
-    }
+    private String reserveWalletTxnRef;
 
     static public boolean isTotallySettled(WalletReservation reservation) {
         return reservation.total == reservation.consumed + reservation.released;
@@ -69,7 +53,14 @@ public class WalletReservation {
         }
     }
 
-    static public WalletReservation create(String reservationId, ServiceId initiator, String referenceId, String walletId, String walletReferenceId, String assetId, Long total, Long remaining, Long consumed, Long pendingSettle, Long released, ReservationStatus reservationStatus, ReservationOutcome reservationOutcome, String reserveTxnId) {
-        return new WalletReservation(reservationId, initiator, referenceId, walletId, walletReferenceId, assetId, total, remaining, consumed, pendingSettle, released, reservationStatus, reservationOutcome, reserveTxnId);
+    static public WalletReservation create(Long internalId, String walletReservationRef,
+                                           ServiceId initiator, String referenceId, String walletRef,
+                                           String assetId, Long total, Long remaining, Long consumed,
+                                           Long pendingSettle, Long released,
+                                           ReservationStatus reservationStatus,
+                                           ReservationOutcome reservationOutcome, String reserveWalletTxnRef) {
+        return new WalletReservation(internalId, walletReservationRef, initiator, referenceId, walletRef,
+                assetId, total, remaining, consumed, pendingSettle, released, reservationStatus,
+                reservationOutcome, reserveWalletTxnRef);
     }
 }

@@ -15,13 +15,13 @@ service PostService {
 }
 
 message PostTransactionRequestPb {
-  string referenceId = 1;
+  string wallet_txn_ref = 1;
   string description = 2;
   repeated LedgerEntryPb entries = 3;
 }
 
 message PostTransactionReplyPb {
-  string referenceId = 1;
+  string wallet_txn_ref = 1;
   string ledgerTxnId = 2;
   common.ErrorPb error = 3;
 }

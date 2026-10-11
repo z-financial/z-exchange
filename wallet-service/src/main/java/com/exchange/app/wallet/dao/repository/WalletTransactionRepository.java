@@ -24,12 +24,13 @@ public class WalletTransactionRepository extends DbBaseRepository<WalletTransact
         super(walletTransactionMapper);
     }
 
-    public WalletTransaction selectById(Long id) {
-        return mapper.selectById(id);
+    public WalletTransaction selectByInternalId(Long internalId) {
+        return mapper.selectById(internalId);
     }
 
-    public WalletTransaction selectByTxnId(String txnId) {
-        var query = Wrappers.<WalletTransaction>lambdaQuery().eq(WalletTransaction::getTxnId, txnId);
+    public WalletTransaction selectByWalletTxnRef(String walletTxnRef) {
+        var query = Wrappers.<WalletTransaction>lambdaQuery()
+                .eq(WalletTransaction::getWalletTxnRef, walletTxnRef);
         return mapper.selectOne(query);
     }
 
@@ -49,7 +50,8 @@ public class WalletTransactionRepository extends DbBaseRepository<WalletTransact
     // restrict the update field, only update status
     public int updateTransactionStatus(WalletTransaction txn, Long id, TransactionStatus newStatus) {
         LambdaUpdateWrapper<WalletTransaction> update = new LambdaUpdateWrapper<>();
-        update.eq(WalletTransaction::getId, id).eq(WalletTransaction::getTxnStatus, txn.getTxnStatus());
+        update.eq(WalletTransaction::getInternalId, id)
+                .eq(WalletTransaction::getTxnStatus, txn.getTxnStatus());
         WalletTransaction updateTxn = new WalletTransaction();
         updateTxn.setTxnStatus(newStatus);
 

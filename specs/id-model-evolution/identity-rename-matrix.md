@@ -23,9 +23,13 @@ become generated entity references.
 
 Every target `internal_id` is `BIGINT UNSIGNED NOT NULL PRIMARY KEY`, assigned
 by the application and constrained to `1..Long.MAX_VALUE`. Every entity typed
-reference is `CHAR(22) CHARACTER SET ascii COLLATE ascii_bin NOT NULL UNIQUE`.
-The binary collation preserves the case-sensitive Base62 contract. Event-reference
-length belongs to the separate event contract and is not assumed to be 22.
+reference uses `CHAR(ENTITY_REF_LENGTH) CHARACTER SET utf8mb4 COLLATE
+utf8mb4_bin NOT NULL UNIQUE`, where `ENTITY_REF_LENGTH` is `23 + BUCKET_WIDTH`.
+The explicit binary collation preserves the case-sensitive Base62 contract
+instead of inheriting a potentially case-insensitive table collation. The
+logical-bucket width and resulting concrete column length must be finalized
+before schema implementation. Event-reference length belongs to the separate
+event contract and is not assumed to equal the entity-reference length.
 
 Covered Java persistence models use `Long internalId` annotated with
 `@TableId(value = "internal_id", type = IdType.INPUT)`. Entity construction
@@ -40,7 +44,6 @@ not generate or reinterpret the value.
 | `wallet_actions.wallet_id` | `wallet_ref` | generated Wallet reference |
 | `wallet_actions.reservation_id` | `wallet_reservation_ref` | optional generated reservation reference |
 | `wallet_reservations.wallet_id` | `wallet_ref` | generated Wallet reference |
-| `wallet_reservations.wallet_reference_id` | `wallet_business_ref` | caller-owned Wallet business reference |
 | `wallet_reservations.reserve_txn_id` | `reserve_wallet_txn_ref` | generated Wallet transaction reference |
 | `balance_snapshots.wallet_id` | `wallet_ref` | generated Wallet reference; snapshot PK remains `id` |
 | `balance_snapshots.wallet_reference_id` | `wallet_business_ref` | caller-owned Wallet business reference |
@@ -126,4 +129,5 @@ Cache keys, Kafka keys, structured log fields, reconciliation output, and
 idempotency result payloads use the target typed-reference names above.
 Production boundaries never serialize or log `internal_id`. An inbound typed
 reference is decoded by the shared codec with its expected `EntityRefType`;
-business code does not parse it or infer routing from its contents.
+shared routing infrastructure may read its immutable logical bucket, while
+business code does not parse it or infer physical routing from its contents.
